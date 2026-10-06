@@ -110,6 +110,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 	}
 	id := common.HexToHash(p.Pool.Address)
 	currencies := [2]common.Address{common.HexToAddress(p.Pool.Tokens[0].Address), common.HexToAddress(p.Pool.Tokens[1].Address)}
+	candidate.Currencies = currencies
 	for side, currency := range currencies {
 		partition := crypto.Keccak256Hash(id[:], common.LeftPadBytes(currency.Bytes(), 32))
 		mapSlot := func(index int64) common.Hash {

@@ -15,7 +15,7 @@ import (
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
 
-func localSimulator(t *testing.T) *uniswapv4.PoolSimulator {
+func localSimulator(t *testing.T, snapshots ...Snapshot) *uniswapv4.PoolSimulator {
 	t.Helper()
 	address := common.HexToAddress("0x0000000000000000000000000000000000012ac4")
 	previous, exists := uniswapv4.HookFactories[address]
@@ -27,8 +27,12 @@ func localSimulator(t *testing.T) *uniswapv4.PoolSimulator {
 			delete(uniswapv4.HookFactories, address)
 		}
 	})
-	state := fixtureState()
-	snapshot, err := json.Marshal(Snapshot{State: state, BlockNumber: 1})
+	seed := Snapshot{State: fixtureState(), BlockNumber: 1}
+	if len(snapshots) > 0 {
+		seed = snapshots[0]
+	}
+	state := seed.State
+	snapshot, err := json.Marshal(seed)
 	require.NoError(t, err)
 	fetch := uniswapv4.FetchRPCResult{Liquidity: big.NewInt(0), TickSpacing: 10,
 		Slot0: uniswapv4.Slot0Data{SqrtPriceX96: state.Pool.SqrtPriceX96.ToBig(), Tick: big.NewInt(0), LpFee: 2000}, HookExtra: snapshot}

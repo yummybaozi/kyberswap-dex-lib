@@ -3,6 +3,7 @@ package tickerdualpool
 
 import (
 	"errors"
+	"math/big"
 
 	"github.com/holiman/uint256"
 
@@ -26,6 +27,7 @@ type State struct {
 }
 
 type Quote struct {
+	SharedBefore, SharedAfter                                            map[string]*big.Int
 	RawAfter, ClaimsAfter, ManagerCashBeforeSettlement, ManagerCashAfter [2]*uint256.Int
 	ReservesAfter                                                        [2]*AaveReserve
 	VaultsAfter                                                          [2]*AaveInventory
@@ -36,30 +38,9 @@ type Quote struct {
 // QuoteExactInput checks liquidity before applying the same bucket swap and two
 // independently rounded output fees as the contract. It never mutates its inputs.
 func QuoteExactInput(s State, zeroForOne bool, amountIn *uint256.Int) (Quote, error) {
-	if s.Total0 == nil || s.Total1 == nil || s.Pool.Balance0 == nil || s.Pool.Balance1 == nil {
-		return Quote{}, ErrInvalidState
-	}
-	balances := [2]*uint256.Int{s.Pool.Balance0, s.Pool.Balance1}
-	totals := [2]*uint256.Int{s.Total0, s.Total1}
-	unbacked := [2]*uint256.Int{s.Unbacked0, s.Unbacked1}
-	poolState := s.Pool
-	for i := range balances {
-		var available uint256.Int
-		available.Set(balances[i])
-		if unbacked[i] != nil {
-			if available.Cmp(unbacked[i]) < 0 {
-				return Quote{}, ErrInvalidState
-			}
-			available.Sub(&available, unbacked[i])
-		}
-		if available.Cmp(totals[i]) < 0 {
-			return Quote{}, ErrVaultIlliquid
-		}
-		if i == 0 {
-			poolState.Balance0 = available.Clone()
-		} else {
-			poolState.Balance1 = available.Clone()
-		}
+	poolState, err := realizablePool(s)
+	if err != nil {
+		return Quote{}, err
 	}
 	swap, err := dualpool.QuoteExactInput(poolState, s.TickSpacing, zeroForOne, amountIn)
 	if err != nil {
@@ -82,4 +63,36 @@ func QuoteExactInput(s State, zeroForOne bool, amountIn *uint256.Int) (Quote, er
 		return Quote{}, dualpool.ErrZeroOutput
 	}
 	return Quote{Swap: swap, NetOutput: net, HookFee: fee, CreatorTax: tax}, nil
+}
+
+// Check the full backing before either forward pricing or reverse search. A
+// reserve shortage is independent of trade size and should retain its error.
+func realizablePool(s State) (dualpool.Extra, error) {
+	if s.Total0 == nil || s.Total1 == nil || s.Pool.Balance0 == nil || s.Pool.Balance1 == nil {
+		return dualpool.Extra{}, ErrInvalidState
+	}
+	balances := [2]*uint256.Int{s.Pool.Balance0, s.Pool.Balance1}
+	totals := [2]*uint256.Int{s.Total0, s.Total1}
+	unbacked := [2]*uint256.Int{s.Unbacked0, s.Unbacked1}
+	poolState := s.Pool
+	for i := range balances {
+		var available uint256.Int
+		available.Set(balances[i])
+		if unbacked[i] != nil {
+			if available.Cmp(unbacked[i]) < 0 {
+				return dualpool.Extra{}, ErrInvalidState
+			}
+			available.Sub(&available, unbacked[i])
+		}
+		if available.Cmp(totals[i]) < 0 {
+			return dualpool.Extra{}, ErrVaultIlliquid
+		}
+		if i == 0 {
+			poolState.Balance0 = available.Clone()
+		} else {
+			poolState.Balance1 = available.Clone()
+		}
+	}
+
+	return poolState, nil
 }

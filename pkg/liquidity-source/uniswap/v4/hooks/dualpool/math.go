@@ -266,7 +266,7 @@ func swapExactInWithSpacing(positions []position, sqrtP *uint256.Int, tick int, 
 			if !found && spacing == 0 {
 				break
 			}
-			sqrt.Set(&sqrtNextTick)
+			sqrt.Set(target)
 		} else {
 			sqrtNext, stepIn, stepOut, fee, err := computeSwapStepExactIn(sqrt, target, liquidity, remaining, feePips)
 			if err != nil {
@@ -336,8 +336,29 @@ func swapExactInWithSpacing(positions []position, sqrtP *uint256.Int, tick int, 
 	}
 	collected := make([]*uint256.Int, len(positions))
 	for i, p := range positions {
+		// All buckets use LP_SALT. Identical ranges therefore share one position:
+		// its first removal collects fees on their combined liquidity, rounded once.
+		collected[i] = new(uint256.Int)
+		first := true
+		for j := 0; j < i; j++ {
+			if positions[j].tickLower == p.tickLower && positions[j].tickUpper == p.tickUpper {
+				first = false
+				break
+			}
+		}
+		if !first {
+			continue
+		}
+		combined := p.liquidity.Clone()
+		for j := i + 1; j < len(positions); j++ {
+			if positions[j].tickLower == p.tickLower && positions[j].tickUpper == p.tickUpper {
+				if _, overflow := combined.AddOverflow(combined, positions[j].liquidity); overflow {
+					return nil, ErrInsufficientLiquidity
+				}
+			}
+		}
 		var err error
-		collected[i], err = v3Utils.MulDiv(growth[i], p.liquidity, q128)
+		collected[i], err = v3Utils.MulDiv(growth[i], combined, q128)
 		if err != nil {
 			return nil, err
 		}

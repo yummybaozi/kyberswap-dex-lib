@@ -17,6 +17,7 @@ import (
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/entity"
 	uniswapv4 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4/hooks/dualpool"
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
 
 //go:embed abis/Ticker.json
@@ -31,6 +32,7 @@ var tickerABI = func() abi.ABI {
 var ErrRefreshRequired = errors.New("Ticker vault state must be refreshed after simulated JIT teardown")
 
 type Snapshot struct {
+	Currencies               [2]common.Address
 	Reserves                 [2]*AaveReserve
 	Limits                   [2]*AaveLimits
 	Raw, Claims, ManagerCash [2]*uint256.Int
@@ -61,12 +63,15 @@ func NewHook(p *uniswapv4.HookParam) uniswapv4.Hook {
 	}
 	return h
 }
-func (h *Hook) GetExchange() string               { return "uniswap-v4-ticker-dualpool" }
+func (h *Hook) GetExchange() string               { return valueobject.ExchangeUniswapV4TickerDualPool }
 func (h *Hook) AllowEmptyTicks() bool             { return true }
 func (h *Hook) CanBeforeSwap(common.Address) bool { return true }
 func (h *Hook) CanAfterSwap(common.Address) bool  { return false }
 
 func (h *Hook) BeforeSwap(p *uniswapv4.BeforeSwapParams) (*uniswapv4.BeforeSwapResult, error) {
+	if p.Limit != nil {
+		return h.beforeSwapWithLimit(p)
+	}
 	if h.decodeErr != nil {
 		return nil, h.decodeErr
 	}
@@ -352,4 +357,10 @@ func (h *Hook) trackBase(ctx context.Context, p *uniswapv4.HookParam) (json.RawM
 	h.decodeErr = nil
 	h.refreshRequired = false
 	return json.Marshal(next)
+}
+
+// JIT positions are removed after every swap. Publish the hook's exact backing
+// and price to the parent simulator instead of its generic reserve deltas.
+func (h *Hook) PoolState() uniswapv4.HookPoolState {
+	return uniswapv4.HookPoolState{Reserves: [2]*big.Int{h.Total0.ToBig(), h.Total1.ToBig()}, SqrtPriceX96: *h.State.Pool.SqrtPriceX96, Tick: int(h.State.Pool.Tick)}
 }

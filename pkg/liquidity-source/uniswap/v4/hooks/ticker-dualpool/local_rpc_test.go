@@ -28,7 +28,11 @@ func TestTrackerAgainstFreshLocalMonadFork(t *testing.T) {
 	u, err := url.Parse(endpoint)
 	require.NoError(t, err)
 	require.True(t, net.ParseIP(u.Hostname()).IsLoopback(), "this test only accepts local RPC")
-	raw, err := os.ReadFile("/tmp/ticker-kyber-rpc-manifest.json")
+	manifestPath := os.Getenv("KYBER_FIXTURE_MANIFEST")
+	if manifestPath == "" {
+		manifestPath = "/tmp/ticker-kyber-rpc-manifest.json"
+	}
+	raw, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
 	var manifest struct{ Hook, Vault, PoolId, StateView, Token0, Token1 string }
 	require.NoError(t, json.Unmarshal(raw, &manifest))

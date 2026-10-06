@@ -6,6 +6,7 @@ import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {LiquidityBucket} from "@uniswap/v4-hooks-public/src/alf/types/Distribution.sol";
 import {console2} from "forge-std/console2.sol";
 
 // Uses the pinned Ticker repository's real proxy, hook, PoolManager, and vault fixture.
@@ -54,4 +55,43 @@ contract TickerQuoteFixture is TickerDualPoolLpFeeTest {
             console2.log(uint256(price));console2.logInt(tick);console2.log(a0);console2.log(a1);
         }
     }
+    function test_exportRangeConfigurations() public {
+        uint256[3] memory amounts=[uint256(1001),100_000e18,900_000e18];
+        for(uint256 config;config<3;++config) {
+            LiquidityBucket[] memory buckets;
+            if(config==0) {
+                buckets=new LiquidityBucket[](8);
+                for(uint256 i;i<8;++i) {
+                    int24 width=int24(int256(1000+1000*i));
+                    buckets[i]=LiquidityBucket(-width,width,1250);
+                }
+            } else if(config==1) {
+                buckets=new LiquidityBucket[](3);
+                buckets[0]=LiquidityBucket(-1000,1000,4000);
+                buckets[1]=LiquidityBucket(-10000,-2000,3000);
+                buckets[2]=LiquidityBucket(2000,10000,3000);
+            } else {
+                buckets=new LiquidityBucket[](2);
+                buckets[0]=LiquidityBucket(-1000,1000,5000);
+                buckets[1]=LiquidityBucket(-1000,1000,5000);
+            }
+            vm.prank(hook.owner());
+            hook.setDistribution(pk,buckets);
+            for(uint256 side;side<2;++side) for(uint256 i;i<amounts.length;++i) {
+                uint256 snapshot=vm.snapshotState();
+                BalanceDelta delta=_trade(side==0,amounts[i]);
+                (uint160 price,int24 tick,,)=manager.getSlot0(id);
+                (uint256 a0,uint256 a1)=hook.totalAssets(pk);
+                address out=side==0?address(quote):address(memecoin);
+                console2.log("RANGES config,side,input,used,net,fee,tax,price,tick,after0,after1");
+                console2.log(config);console2.log(side);console2.log(amounts[i]);
+                console2.log(_abs(side==0?delta.amount0():delta.amount1()));
+                console2.log(_abs(side==0?delta.amount1():delta.amount0()));
+                console2.log(hook.pendingFees(id,out));console2.log(hook.pendingCreatorTax(id,out));
+                console2.log(uint256(price));console2.logInt(tick);console2.log(a0);console2.log(a1);
+                assertTrue(vm.revertToState(snapshot));
+            }
+        }
+    }
+
 }

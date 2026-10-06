@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
@@ -35,6 +36,7 @@ contract ForkYieldRecipient is ITickerYieldRecipientSource {
 
 // No broadcast: all deployments and balance changes exist only in Foundry's fork.
 contract TickerMonadFork is Test {
+    using stdStorage for StdStorage;
     using PoolIdLibrary for PoolKey;
     using StateLibrary for IPoolManager;
     IPoolManager constant manager = IPoolManager(0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e);
@@ -152,6 +154,113 @@ contract TickerMonadFork is Test {
         assertGt(buyZero?second.amount0():second.amount1(),0,"raw inventory should support the reverse trade");
     }
 
+
+    function test_twoPoolsShareAaveWithdrawalCash() public {
+        // Different pool key and separate wrapper; both lend USDC to the same reserve.
+        PoolKey memory second=key;
+        second.fee=3000;
+        TickerVault otherVault=new TickerVault(usdc,strategy,new ForkYieldRecipient(),10_000,"Other USDC","oUSDC");
+        bool usdc0=Currency.unwrap(key.currency0)==address(usdc);
+        (uint160 price,int24 tick,,)=manager.getSlot0(key.toId());
+        LiquidityBucket[] memory buckets=new LiquidityBucket[](1);
+        buckets[0]=LiquidityBucket(tick-10000,tick+10000,10000);
+        hook.initializePool(second,DualPoolHook.PoolConfig(price,buckets,false,
+            usdc0?IERC4626(address(otherVault)):IERC4626(address(0)),
+            usdc0?IERC4626(address(0)):IERC4626(address(otherVault)),0));
+        hook.registerPool(second,address(token),address(this),address(this),50,false,
+            FeePolicySnapshot(address(this),3000,5000,100,300));
+        hook.bootstrap(second,usdc0?10_000e6:1_000_000e18,usdc0?1_000_000e18:10_000e6);
+        token.mint(address(this),10_000e18);
+        address aave=0x69a5F9AD4f96ebf0a0C792dD42a01cC5C0102fef;
+        // Only on this fork: make Aave's authoritative withdrawal cash scarce.
+        // Its actual supply/withdraw code then updates this counter during swaps.
+        stdstore.target(aave).sig("getVirtualUnderlyingBalance(address)").with_key(address(usdc))
+            .enable_packed_slots().checked_write(uint256(10_001e6));
+        assertEq(otherVault.maxWithdraw(address(hook)),otherVault.convertToAssets(otherVault.balanceOf(address(hook))));
+        bool sellZero=!usdc0;
+        SwapParams memory sell=SwapParams(sellZero,-int256(1000e18),sellZero?TickMath.MIN_SQRT_PRICE+1:TickMath.MAX_SQRT_PRICE-1);
+        router.swap(key,sell,PoolSwapTest.TestSettings(false,false),"");
+        uint256 backing=otherVault.convertToAssets(otherVault.balanceOf(address(hook)));
+        assertLt(otherVault.maxWithdraw(address(hook)),backing,"first pool consumes cash available to second pool");
+        try router.swap(second,sell,PoolSwapTest.TestSettings(false,false),"") returns(BalanceDelta) {
+            fail("second pool must reject incomplete liquidity");
+        } catch(bytes memory reason) {
+            // PoolManager wraps the hook's custom error.
+            bytes memory body=new bytes(reason.length-4);
+            for(uint256 i;i<body.length;++i)body[i]=reason[i+4];
+            (address target,,bytes memory inner,)=abi.decode(body,(address,bytes4,bytes,bytes));
+            assertEq(target,address(hook));
+            assertEq(bytes4(inner),TickerDualPoolHookBase.VaultIlliquid.selector);
+        }
+        stdstore.target(aave).sig("getVirtualUnderlyingBalance(address)").with_key(address(usdc))
+            .enable_packed_slots().checked_write(uint256(10_001e6));
+        BalanceDelta recovered=router.swap(second,sell,PoolSwapTest.TestSettings(false,false),"");
+        assertGt(sellZero?recovered.amount1():recovered.amount0(),0,"restored reserve cash permits trading");
+    }
+
+
+
+    function test_exportDirectionalProtocolFees() public {
+        uint24 protocol=uint24(250|(1000<<12));
+        vm.prank(manager.protocolFeeController());
+        manager.setProtocolFee(key,protocol);
+        for(uint256 i;i<4;++i) {
+            uint256 snapshot=vm.snapshotState();
+            bool direction=i<2;
+            uint256 amount=direction?(i==0?100e6:1000e6):(i==2?1000e18:100000e18);
+            (uint256 b0,uint256 b1)=hook.getEffectiveLiquidity(key);
+            (uint160 beforePrice,int24 beforeTick,,)=manager.getSlot0(key.toId());
+            BalanceDelta delta=router.swap(key,SwapParams(direction,-int256(amount),direction?TickMath.MIN_SQRT_PRICE+1:TickMath.MAX_SQRT_PRICE-1),PoolSwapTest.TestSettings(false,false),"");
+            (uint160 price,int24 tick,,)=manager.getSlot0(key.toId());
+            address output=Currency.unwrap(direction?key.currency1:key.currency0);
+            console2.log("PROTOCOL direction,input,before0,before1,initialPrice,initialTick,protocol,net,fee,tax,price,tick");
+            console2.log(direction);console2.log(amount);console2.log(b0);console2.log(b1);
+            console2.log(uint256(beforePrice));console2.logInt(beforeTick);console2.log(uint256(protocol));
+            console2.logInt(direction?delta.amount1():delta.amount0());
+            console2.log(hook.pendingFees(key.toId(),output));console2.log(hook.pendingCreatorTax(key.toId(),output));
+            console2.log(uint256(price));console2.logInt(tick);
+            assertTrue(vm.revertToState(snapshot));
+        }
+    }
+
+    function test_exportElapsedAaveTreasuryAccrual() public {
+        vm.warp(block.timestamp+1 days);
+        address aave=0x69a5F9AD4f96ebf0a0C792dD42a01cC5C0102fef;
+        (bool ok,bytes memory beforeData)=aave.staticcall(abi.encodeWithSignature("getReserveData(address)",address(usdc)));
+        assertTrue(ok);
+        address aToken=address(uint160(_word(beforeData,8)));
+        address debtToken=address(uint160(_word(beforeData,10)));
+        uint256 storedTreasury=_word(beforeData,12);
+        uint256 rate=strategy.convertToAssets(1e27);
+        uint256 factor=(_word(beforeData,0)>>64)&0xffff;
+        uint256 scaledDebt=_readUint(debtToken,abi.encodeWithSignature("scaledTotalSupply()"));
+        uint256 previousIndex=_word(beforeData,3);
+        uint256 nextIndex=_readUint(aave,abi.encodeWithSignature("getReserveNormalizedVariableDebt(address)",address(usdc)));
+        uint256 supplyBefore=_readUint(aToken,abi.encodeWithSignature("scaledTotalSupply()"))+storedTreasury;
+        uint256 cashBefore=_readUint(aave,abi.encodeWithSignature("getVirtualUnderlyingBalance(address)",address(usdc)));
+        uint256 held=strategy.balanceOf(address(vault));
+        vm.prank(address(vault));
+        strategy.withdraw(100e6,address(vault),address(vault));
+        (ok,beforeData)=aave.staticcall(abi.encodeWithSignature("getReserveData(address)",address(usdc)));
+        assertTrue(ok);
+        uint256 treasuryDelta=_word(beforeData,12)-storedTreasury;
+        assertGt(treasuryDelta,0,"elapsed interest should accrue treasury shares");
+        console2.log("ACCRUAL rate,factor,scaledDebt,previousIndex,nextIndex,supplyBefore,cashBefore,held,withdraw,treasuryDelta,supplyAfter,cashAfter");
+        console2.log(rate);console2.log(factor);console2.log(scaledDebt);console2.log(previousIndex);console2.log(nextIndex);
+        console2.log(supplyBefore);console2.log(cashBefore);console2.log(held);console2.log(uint256(100e6));console2.log(treasuryDelta);
+        console2.log(_readUint(aToken,abi.encodeWithSignature("scaledTotalSupply()"))+_word(beforeData,12));
+        console2.log(_readUint(aave,abi.encodeWithSignature("getVirtualUnderlyingBalance(address)",address(usdc))));
+    }
+
+    function _word(bytes memory data,uint256 index) internal pure returns(uint256 value) {
+        require(data.length>=(index+1)*32);
+        assembly {value:=mload(add(add(data,32),mul(index,32)))}
+    }
+    function _readUint(address target,bytes memory callData) internal view returns(uint256) {
+        (bool ok,bytes memory result)=target.staticcall(callData);
+        require(ok);return abi.decode(result,(uint256));
+    }
+
     function _dumpManager(string memory label) internal view {
         console2.log(label);
         console2.log(IERC20(Currency.unwrap(key.currency0)).balanceOf(address(manager)));
@@ -190,7 +299,8 @@ contract TickerMonadFork is Test {
             storageJson=string.concat(storageJson,"}");
             allocation=string.concat(allocation,i==0?"":",",'"',vm.toString(account),'":{"code":"',vm.toString(account.code),'","nonce":',vm.toString(vm.getNonce(account)),',"balance":',vm.toString(account.balance),',"storage":',storageJson,"}");
         }
-        vm.writeJson(string.concat(allocation,"}"),"/private/tmp/ticker-kyber-rpc-allocs.json");
+        string memory outputDir=vm.envOr("KYBER_FIXTURE_OUTPUT_DIR",string("/tmp"));
+        vm.writeJson(string.concat(allocation,"}"),string.concat(outputDir,"/ticker-kyber-rpc-allocs.json"));
         string memory object="fixture";
         vm.serializeAddress(object,"router",address(router));
         vm.serializeAddress(object,"payer",address(this));
@@ -204,6 +314,6 @@ contract TickerMonadFork is Test {
         vm.serializeString(object,"poolId",vm.toString(PoolId.unwrap(key.toId())));
         vm.serializeUint(object,"block",block.number);
         string memory manifest=vm.serializeUint(object,"timestamp",block.timestamp);
-        vm.writeJson(manifest,"/private/tmp/ticker-kyber-rpc-manifest.json");
+        vm.writeJson(manifest,string.concat(outputDir,"/ticker-kyber-rpc-manifest.json"));
     }
 }

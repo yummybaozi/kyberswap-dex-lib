@@ -82,18 +82,21 @@ func readAaveReserve(ctx context.Context, p *uniswapv4.HookParam, strategy, asse
 	}
 	// Aave accrues the reserve's share of new interest on its next supply/withdraw.
 	// Native maxDeposit still uses the stored treasury amount until that mutation.
-	previous := uint256.MustFromBig(data.VariableBorrowIndex)
-	current := uint256.MustFromBig(normalizedDebt)
-	if current.Cmp(previous) < 0 {
-		return nil, ErrInvalidState
-	}
-	debtAccrued, err := v3Utils.MulDiv(uint256.MustFromBig(scaledDebt), new(uint256.Int).Sub(current, previous), ray)
+	factor := new(uint256.Int).Rsh(conf, 64).Uint64() & 65535
+	pending, err := pendingTreasuryShares(uint256.MustFromBig(scaledDebt), uint256.MustFromBig(data.VariableBorrowIndex), uint256.MustFromBig(normalizedDebt), rate, factor)
 	if err != nil {
 		return nil, err
 	}
-	factor := new(uint256.Int).Rsh(conf, 64).Uint64() & 65535
-	if factor > 10000 {
+	return &AaveReserve{Cash: uint256.MustFromBig(cash), ScaledSupply: supply, SupplyCap: cap, PendingTreasury: pending, Active: bit(56), Frozen: bit(57), Paused: bit(60)}, nil
+}
+
+func pendingTreasuryShares(debt, previous, current, rate *uint256.Int, factor uint64) (*uint256.Int, error) {
+	if debt == nil || previous == nil || current == nil || rate == nil || rate.IsZero() || factor > 10000 || current.Cmp(previous) < 0 {
 		return nil, ErrInvalidState
+	}
+	debtAccrued, err := v3Utils.MulDiv(debt, new(uint256.Int).Sub(current, previous), ray)
+	if err != nil {
+		return nil, err
 	}
 	product := new(uint256.Int)
 	if _, over := product.MulOverflow(debtAccrued, uint256.NewInt(factor)); over {
@@ -104,9 +107,5 @@ func readAaveReserve(ctx context.Context, p *uniswapv4.HookParam, strategy, asse
 		return nil, err
 	}
 	treasuryAssets := product.Div(product, uint256.NewInt(10000))
-	pending, err := v3Utils.MulDiv(treasuryAssets, ray, rate)
-	if err != nil {
-		return nil, err
-	}
-	return &AaveReserve{Cash: uint256.MustFromBig(cash), ScaledSupply: supply, SupplyCap: cap, PendingTreasury: pending, Active: bit(56), Frozen: bit(57), Paused: bit(60)}, nil
+	return v3Utils.MulDiv(treasuryAssets, ray, rate)
 }

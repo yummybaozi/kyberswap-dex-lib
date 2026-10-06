@@ -16,6 +16,9 @@ func QuoteRequiredInput(s State, zeroForOne bool, desired *uint256.Int) (Quote, 
 	if desired == nil || desired.IsZero() || desired.BitLen() > 127 {
 		return Quote{}, ErrInvalidState
 	}
+	if _, err := realizablePool(s); err != nil {
+		return Quote{}, err
+	}
 	hook, tax := uint64(0), uint64(0)
 	if s.Registered {
 		hook = uint64(s.HookFeeBps)
