@@ -192,6 +192,7 @@ type swapResult struct {
 	amountIn, amountOut *uint256.Int // amountIn includes the fee (what the swapper pays)
 	sqrtPriceX96        *uint256.Int
 	tick                int
+	positionFees        []*uint256.Int
 }
 
 // swapExactIn runs Pool.swap over the bucket positions exactly as the PoolManager
@@ -199,6 +200,13 @@ type swapResult struct {
 // ticks, liquidityNet crossings at bucket edges, fee taken per step.
 func swapExactIn(positions []position, sqrtP *uint256.Int, tick int, zeroForOne bool,
 	amountIn *uint256.Int, feePips uint64) (*swapResult, error) {
+	return swapExactInWithSpacing(positions, sqrtP, tick, zeroForOne, amountIn, feePips, 0)
+}
+
+// A positive spacing preserves v4's uninitialized bitmap-word boundaries. The
+// existing integration retains its historical stepping when spacing is zero.
+func swapExactInWithSpacing(positions []position, sqrtP *uint256.Int, tick int, zeroForOne bool,
+	amountIn *uint256.Int, feePips uint64, spacing int, protocolPips ...uint64) (*swapResult, error) {
 	// initialized ticks and their net liquidity
 	net := map[int]*uint256.Int{}
 	sign := map[int]int{}
@@ -226,12 +234,20 @@ func swapExactIn(positions []position, sqrtP *uint256.Int, tick int, zeroForOne 
 		limit.SubUint64(v3Utils.MaxSqrtRatioU256, 1)
 	}
 
+	growth := make([]*uint256.Int, len(positions))
+	for i := range growth {
+		growth[i] = new(uint256.Int)
+	}
+	q128 := new(uint256.Int).Lsh(uint256.NewInt(1), 128)
 	remaining := amountIn.Clone()
 	totalIn, totalOut := new(uint256.Int), new(uint256.Int)
 	sqrt := sqrtP.Clone()
 
 	for !remaining.IsZero() && sqrt.Cmp(&limit) != 0 {
 		tNext, found := nextTick(ticks, tick, zeroForOne)
+		if spacing > 0 {
+			tNext, found = nextTickWithinWord(ticks, tick, spacing, zeroForOne)
+		}
 		if tNext < v3Utils.MinTick {
 			tNext = v3Utils.MinTick
 		} else if tNext > v3Utils.MaxTick {
@@ -247,7 +263,7 @@ func swapExactIn(positions []position, sqrtP *uint256.Int, tick int, zeroForOne 
 		}
 		if liquidity.IsZero() {
 			// nothing to trade against here: jump to the next initialized tick without output
-			if !found {
+			if !found && spacing == 0 {
 				break
 			}
 			sqrt.Set(&sqrtNextTick)
@@ -258,6 +274,27 @@ func swapExactIn(positions []position, sqrtP *uint256.Int, tick int, zeroForOne 
 			}
 			var paid uint256.Int
 			paid.Add(stepIn, fee)
+			// Each active position earns the same per-liquidity fee growth.
+			// v4 rounds growth per step, then rounds each position's collection.
+			lpFee := fee.Clone()
+			if len(protocolPips) > 0 && protocolPips[0] != 0 {
+				protocol := new(uint256.Int)
+				if feePips == protocolPips[0] {
+					protocol.Set(fee)
+				} else {
+					protocol.Mul(&paid, uint256.NewInt(protocolPips[0])).Div(protocol, uMaxSwapFee)
+				}
+				lpFee.Sub(lpFee, protocol)
+			}
+			stepGrowth, err := v3Utils.MulDiv(lpFee, q128, liquidity)
+			if err != nil {
+				return nil, err
+			}
+			for i, p := range positions {
+				if p.tickLower <= tick && tick < p.tickUpper {
+					growth[i].Add(growth[i], stepGrowth)
+				}
+			}
 			remaining.Sub(remaining, &paid)
 			totalIn.Add(totalIn, &paid)
 			totalOut.Add(totalOut, stepOut)
@@ -287,7 +324,7 @@ func swapExactIn(positions []position, sqrtP *uint256.Int, tick int, zeroForOne 
 			}
 			tick = t
 		}
-		if !found && liquidity.IsZero() {
+		if !found && liquidity.IsZero() && spacing == 0 {
 			break
 		}
 	}
@@ -297,7 +334,15 @@ func swapExactIn(positions []position, sqrtP *uint256.Int, tick int, zeroForOne 
 	if totalOut.IsZero() {
 		return nil, ErrZeroOutput
 	}
-	return &swapResult{amountIn: totalIn, amountOut: totalOut, sqrtPriceX96: sqrt, tick: tick}, nil
+	collected := make([]*uint256.Int, len(positions))
+	for i, p := range positions {
+		var err error
+		collected[i], err = v3Utils.MulDiv(growth[i], p.liquidity, q128)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &swapResult{amountIn: totalIn, amountOut: totalOut, sqrtPriceX96: sqrt, tick: tick, positionFees: collected}, nil
 }
 
 // addNet accumulates |liquidityNet| per tick with its sign; buckets never overlap
@@ -337,4 +382,29 @@ func nextTick(ticks []int, tick int, zeroForOne bool) (int, bool) {
 		return v3Utils.MaxTick, false
 	}
 	return ticks[i], true
+}
+
+// nextTickWithinWord follows v4 TickBitmap: search only the current 256-bit
+// word, returning its edge when it contains no initialized tick in this direction.
+// Division must round down for negative ticks, rather than Go's truncation to zero.
+func nextTickWithinWord(ticks []int, tick, spacing int, zeroForOne bool) (int, bool) {
+	compressed := tick / spacing
+	if tick < 0 && tick%spacing != 0 {
+		compressed--
+	}
+	if zeroForOne {
+		boundary := (compressed >> 8) * 256 * spacing
+		i := sort.SearchInts(ticks, tick+1) - 1
+		if i >= 0 && ticks[i] >= boundary {
+			return ticks[i], true
+		}
+		return boundary, false
+	}
+	compressed++
+	boundary := (((compressed>>8)+1)*256 - 1) * spacing
+	i := sort.SearchInts(ticks, tick+1)
+	if i < len(ticks) && ticks[i] <= boundary {
+		return ticks[i], true
+	}
+	return boundary, false
 }
