@@ -20,7 +20,7 @@ import (
 	uniswapv4 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4"
 )
 
-func TestTrackerDecodesPinnedSnapshot(t *testing.T) {
+func TestBaseTrackerDecodesPinnedSnapshot(t *testing.T) {
 	readABI := func(path string) abi.ABI {
 		b, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -95,7 +95,7 @@ func TestTrackerDecodesPinnedSnapshot(t *testing.T) {
 		RpcClient: ethrpc.New(server.URL).SetMulticallContract(common.HexToAddress("0x4567")),
 		Pool:      &entity.Pool{Address: common.HexToHash("0x1").Hex(), StaticExtra: string(static), Tokens: []*entity.PoolToken{{Address: "0x1"}, {Address: "0x2"}}}}
 	h := NewHook(p).(*Hook)
-	raw, err := h.Track(context.Background(), p)
+	raw, err := h.trackBase(context.Background(), p)
 	require.NoError(t, err)
 	require.Equal(t, 2, calls)
 	var next Snapshot

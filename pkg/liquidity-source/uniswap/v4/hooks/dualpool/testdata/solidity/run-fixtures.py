@@ -15,6 +15,7 @@ import tempfile
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("ticker_checkout", type=Path)
 parser.add_argument("--fork", action="store_true")
+parser.add_argument("--match-test", help="optional Foundry test filter")
 args = parser.parse_args()
 root = args.ticker_checkout.resolve()
 expected = "a8b41e44916d3d6266f8d38f2f3cd116c2379207"
@@ -37,5 +38,5 @@ with tempfile.TemporaryDirectory(prefix="ticker-kyber-fixture-") as folder:
     }
     (target / "foundry.toml").write_text("[profile.default]\n" + "\n".join(
         key + " = " + json.dumps(value) for key, value in config.items()) + "\n")
-    test = "test_freshAavePoolTradesBothWays" if args.fork else "test_export"
+    test = args.match_test or ("test_freshAavePoolTradesBothWays" if args.fork else "test_export")
     subprocess.run(["forge", "test", "--root", str(target), "--match-test", test, "-vv"], check=True)

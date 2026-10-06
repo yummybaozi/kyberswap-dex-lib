@@ -31,6 +31,10 @@ var tickerABI = func() abi.ABI {
 var ErrRefreshRequired = errors.New("Ticker vault state must be refreshed after simulated JIT teardown")
 
 type Snapshot struct {
+	Reserves                 [2]*AaveReserve
+	Limits                   [2]*AaveLimits
+	Raw, Claims, ManagerCash [2]*uint256.Int
+	Aave                     [2]*AaveInventory
 	State
 	Vaults      [2]common.Address
 	BlockNumber uint64
@@ -76,17 +80,112 @@ func (h *Hook) BeforeSwap(p *uniswapv4.BeforeSwapParams) (*uniswapv4.BeforeSwapR
 	if overflow {
 		return nil, ErrInvalidState
 	}
+	state := h.State
+	// Recompute available vault cash after each simulated reserve change.
+	// Keep total share value separate so the 100% check sees any shortage.
+	for side, inventory := range h.Aave {
+		if inventory == nil || h.Reserves[side] == nil {
+			continue
+		}
+		available, err := inventory.realizableAssets(*h.Reserves[side])
+		if err != nil {
+			return nil, err
+		}
+		if side == 0 {
+			state.Pool.Balance0 = available
+		} else {
+			state.Pool.Balance1 = available
+		}
+	}
 	var q Quote
 	var err error
 	if p.CalcOut {
-		q, err = QuoteExactInput(h.State, p.ZeroForOne, amount)
+		q, err = QuoteExactInput(state, p.ZeroForOne, amount)
 	} else {
-		q, err = QuoteRequiredInput(h.State, p.ZeroForOne, amount)
+		q, err = QuoteRequiredInput(state, p.ZeroForOne, amount)
 	}
 	if err != nil {
 		return nil, err
 	}
-	result := &uniswapv4.BeforeSwapResult{SwapFee: uniswapv4.FeeAmount(h.State.Pool.LpFee), Gas: h.SwapGas, SwapInfo: q}
+	for side, inventory := range h.Aave {
+		if inventory == nil {
+			continue
+		}
+		minted, returned := q.Swap.Mint0, q.Swap.Burn0
+		if side == 1 {
+			minted, returned = q.Swap.Mint1, q.Swap.Burn1
+		}
+		var next AaveInventory
+		var err error
+		if reserve := h.Reserves[side]; reserve != nil {
+			var nextReserve AaveReserve
+			next, nextReserve, err = inventory.AfterJITWithReserve(minted, returned, *reserve)
+			q.ReservesAfter[side] = &nextReserve
+		} else {
+			next, err = inventory.AfterJIT(minted, returned)
+		}
+		if err != nil {
+			return nil, err
+		}
+		assets, err := next.poolAssets()
+		if err != nil {
+			return nil, err
+		}
+		q.VaultsAfter[side] = &next
+		if side == 0 {
+			q.Swap.Balance0 = assets
+		} else {
+			q.Swap.Balance1 = assets
+		}
+	}
+	for side := 0; side < 2; side++ {
+		if h.Raw[side] == nil || h.Claims[side] == nil || h.ManagerCash[side] == nil {
+			continue
+		}
+		minted, returned := q.Swap.Mint0, q.Swap.Burn0
+		if side == 1 {
+			minted, returned = q.Swap.Mint1, q.Swap.Burn1
+		}
+		if next := q.VaultsAfter[side]; next != nil {
+			q.RawAfter[side], q.ClaimsAfter[side] = next.Raw.Clone(), next.Claims.Clone()
+		} else {
+			q.RawAfter[side], q.ClaimsAfter[side], err = inventoryAfterJIT(h.Raw[side], h.Claims[side], minted, returned)
+			if err != nil {
+				return nil, err
+			}
+		}
+		cash, err := managerCashAfterJIT(h.ManagerCash[side], h.Claims[side], minted, returned)
+		if err != nil {
+			return nil, err
+		}
+		isInput := (side == 0) == p.ZeroForOne
+		// Exact-input hook fees are taken as tokens before the router settles.
+		// CalcAmountIn also executes exact-input; only its search is reversed.
+		if !isInput {
+			fees, err := addChecked(q.HookFee, q.CreatorTax)
+			if err != nil {
+				return nil, err
+			}
+			if cash.Cmp(fees) < 0 {
+				return nil, ErrVaultIlliquid
+			}
+			cash.Sub(cash, fees)
+		}
+		q.ManagerCashBeforeSettlement[side] = cash.Clone()
+		if isInput {
+			cash, err = addChecked(cash, q.Swap.AmountIn)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			if cash.Cmp(q.NetOutput) < 0 {
+				return nil, ErrVaultIlliquid
+			}
+			cash.Sub(cash, q.NetOutput)
+		}
+		q.ManagerCashAfter[side] = cash
+	}
+	result := &uniswapv4.BeforeSwapResult{SwapFee: uniswapv4.FeeAmount(h.State.Pool.LpFee), Gas: h.quoteGas(q), SwapInfo: q}
 	if p.CalcOut {
 		result.DeltaSpecified = q.Swap.AmountIn.ToBig()
 		result.DeltaUnspecified = new(big.Int).Neg(q.NetOutput.ToBig())
@@ -98,6 +197,15 @@ func (h *Hook) BeforeSwap(p *uniswapv4.BeforeSwapParams) (*uniswapv4.BeforeSwapR
 }
 
 func (h *Hook) UpdateBalance(info any) {
+	h.updateBalance(info, true)
+}
+
+// UpdateBalanceWithoutSettlement is for execution-aware harnesses that issue
+// another swap before paying PoolManager. Kyber's normal UpdateBalance models
+// a settled leg; production adapter settlement still needs independent proof.
+func (h *Hook) UpdateBalanceWithoutSettlement(info any) { h.updateBalance(info, false) }
+
+func (h *Hook) updateBalance(info any, settled bool) {
 	q, ok := info.(Quote)
 	if !ok || q.Swap.Balance0 == nil || q.Swap.Balance1 == nil {
 		return
@@ -110,16 +218,60 @@ func (h *Hook) UpdateBalance(info any) {
 	h.State.Pool.Tick = q.Swap.Tick
 	// JIT arithmetic alone does not model an ERC-4626 withdrawal/redeposit.
 	// Keep this unfinished path explicit rather than publish inaccurate quotes.
-	h.refreshRequired = h.Vaults[0] != (common.Address{}) || h.Vaults[1] != (common.Address{})
+	h.refreshRequired = false
+	for side := range h.Aave {
+		if q.RawAfter[side] != nil && q.ClaimsAfter[side] != nil && q.ManagerCashAfter[side] != nil {
+			h.Raw[side], h.Claims[side] = q.RawAfter[side].Clone(), q.ClaimsAfter[side].Clone()
+			cash := q.ManagerCashAfter[side]
+			if !settled {
+				cash = q.ManagerCashBeforeSettlement[side]
+			}
+			h.ManagerCash[side] = cash.Clone()
+			unbacked := unbackedClaims(h.Claims[side], cash)
+			if side == 0 {
+				h.Unbacked0 = unbacked
+			} else {
+				h.Unbacked1 = unbacked
+			}
+		}
+		if q.VaultsAfter[side] != nil {
+			next := q.VaultsAfter[side].Clone()
+			h.Aave[side] = &next
+			if q.ReservesAfter[side] != nil {
+				reserve := q.ReservesAfter[side].Clone()
+				h.Reserves[side] = &reserve
+			}
+		} else if h.Vaults[side] != (common.Address{}) {
+			h.refreshRequired = true
+		}
+	}
 }
 
 func (h *Hook) CloneState() uniswapv4.Hook {
 	clone := *h
+	for side, inventory := range h.Aave {
+		if inventory != nil {
+			copied := inventory.Clone()
+			clone.Aave[side] = &copied
+		}
+	}
 	copyInt := func(v *uint256.Int) *uint256.Int {
 		if v == nil {
 			return nil
 		}
 		return v.Clone()
+	}
+	for side := range h.Raw {
+		if h.Reserves[side] != nil {
+			reserve := h.Reserves[side].Clone()
+			clone.Reserves[side] = &reserve
+		}
+		clone.Raw[side] = copyInt(h.Raw[side])
+		clone.Claims[side] = copyInt(h.Claims[side])
+		clone.ManagerCash[side] = copyInt(h.ManagerCash[side])
+		if limits := h.Limits[side]; limits != nil {
+			clone.Limits[side] = &AaveLimits{MaxDeposit: copyInt(limits.MaxDeposit), MaxWithdraw: copyInt(limits.MaxWithdraw)}
+		}
 	}
 	clone.Total0 = copyInt(h.Total0)
 	clone.Total1 = copyInt(h.Total1)
@@ -145,7 +297,7 @@ type launchResponse struct {
 	BuybackEnabled                                                                            bool
 }
 
-func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessage, error) {
+func (h *Hook) trackBase(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessage, error) {
 	if p.BlockNumber == nil || p.BlockNumber.Sign() <= 0 || p.Cfg == nil || p.Cfg.StateViewAddress == "" || p.Pool == nil || len(p.Pool.Tokens) != 2 {
 		return nil, ErrInvalidState
 	}

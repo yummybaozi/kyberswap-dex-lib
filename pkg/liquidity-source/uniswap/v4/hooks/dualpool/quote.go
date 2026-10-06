@@ -25,9 +25,15 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 	if len(state.Buckets) == 0 {
 		return SwapInfo{}, ErrNoDistribution
 	}
+	if len(state.Buckets) > 8 {
+		return SwapInfo{}, ErrInvalidQuoteState
+	}
+	if state.ProtocolFee&0xfff > 1000 || state.ProtocolFee>>12 > 1000 {
+		return SwapInfo{}, ErrInvalidQuoteState
+	}
 	var weight uint64
 	for _, b := range state.Buckets {
-		if b.TickLower >= b.TickUpper || int(b.TickLower)%tickSpacing != 0 || int(b.TickUpper)%tickSpacing != 0 {
+		if b.WeightBps == 0 || b.TickLower < -887272 || b.TickUpper > 887272 || b.TickLower >= b.TickUpper || int(b.TickLower)%tickSpacing != 0 || int(b.TickUpper)%tickSpacing != 0 {
 			return SwapInfo{}, ErrInvalidQuoteState
 		}
 		weight += uint64(b.WeightBps)
@@ -48,6 +54,27 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 	if err != nil {
 		return SwapInfo{}, err
 	}
+	// PoolManager limits gross liquidity at each initialized tick. Overlapping
+	// buckets share that limit even when their positions use different salts.
+	minCompressed := -887272 / tickSpacing
+	if -887272%tickSpacing != 0 {
+		minCompressed--
+	}
+	numTicks := 887272/tickSpacing - minCompressed + 1
+	maxPerTick := new(uint256.Int).Div(uMaxUint128, uint256.NewInt(uint64(numTicks)))
+	grossAtTick := make(map[int]*uint256.Int, len(positions)*2)
+	for _, position := range positions {
+		for _, tick := range []int{position.tickLower, position.tickUpper} {
+			gross := grossAtTick[tick]
+			if gross == nil {
+				gross = new(uint256.Int)
+				grossAtTick[tick] = gross
+			}
+			if _, overflow := gross.AddOverflow(gross, position.liquidity); overflow || gross.Cmp(maxPerTick) > 0 {
+				return SwapInfo{}, ErrInvalidQuoteState
+			}
+		}
+	}
 	fee := effectiveSwapFee(state.LpFee, state.ProtocolFee, zeroForOne)
 	if fee >= maxSwapFee {
 		return SwapInfo{}, ErrInvalidQuoteState
@@ -63,6 +90,8 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 	if result.amountOut.BitLen() > 127 {
 		return SwapInfo{}, ErrInvalidQuoteState
 	}
+	minted := [2]*uint256.Int{new(uint256.Int), new(uint256.Int)}
+	returned := [2]*uint256.Int{new(uint256.Int), new(uint256.Int)}
 	balances := [2]*uint256.Int{state.Balance0.Clone(), state.Balance1.Clone()}
 	for i, p := range positions {
 		start, err := positionAmounts(p, state.SqrtPriceX96, true)
@@ -74,6 +103,12 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 			return SwapInfo{}, err
 		}
 		for side := range balances {
+			if _, overflow := minted[side].AddOverflow(minted[side], start[side]); overflow {
+				return SwapInfo{}, ErrInvalidQuoteState
+			}
+			if _, overflow := returned[side].AddOverflow(returned[side], end[side]); overflow {
+				return SwapInfo{}, ErrInvalidQuoteState
+			}
 			if balances[side].Cmp(start[side]) < 0 {
 				return SwapInfo{}, ErrInvalidQuoteState
 			}
@@ -86,11 +121,14 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 		if !zeroForOne {
 			inputSide = 1
 		}
+		if _, overflow := returned[inputSide].AddOverflow(returned[inputSide], result.positionFees[i]); overflow {
+			return SwapInfo{}, ErrInvalidQuoteState
+		}
 		if _, overflow := balances[inputSide].AddOverflow(balances[inputSide], result.positionFees[i]); overflow {
 			return SwapInfo{}, ErrInvalidQuoteState
 		}
 	}
-	return SwapInfo{Balance0: balances[0], Balance1: balances[1], ZeroForOne: zeroForOne, AmountIn: result.amountIn, AmountOut: result.amountOut,
+	return SwapInfo{Mint0: minted[0], Mint1: minted[1], Burn0: returned[0], Burn1: returned[1], Balance0: balances[0], Balance1: balances[1], ZeroForOne: zeroForOne, AmountIn: result.amountIn, AmountOut: result.amountOut,
 		SqrtPriceX96: result.sqrtPriceX96, Tick: int32(result.tick)}, nil
 }
 

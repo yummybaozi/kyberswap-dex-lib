@@ -1,0 +1,50 @@
+[
+  {
+    "before": {
+      "raw": "0",
+      "claims": "0",
+      "poolShares": "10000000000000000",
+      "supply": "10000000000000000",
+      "idle": "0",
+      "strategyShares": "9899743234",
+      "rate": "1010127208674647155365377435",
+      "pendingYield": "0",
+      "claimValue": "9999999999"
+    },
+    "after": {
+      "raw": "0",
+      "claims": "99999998",
+      "poolShares": "9999999999995499",
+      "supply": "9999999999995499",
+      "idle": "0",
+      "strategyShares": "9899743233",
+      "rate": "1010127208674647155365377435",
+      "pendingYield": "0",
+      "claimValue": "9999999998"
+    }
+  },
+  {
+    "before": {
+      "raw": "0",
+      "claims": "99999998",
+      "poolShares": "9999999999995499",
+      "supply": "9999999999995499",
+      "idle": "0",
+      "strategyShares": "9899743233",
+      "rate": "1010127208674647155365377435",
+      "pendingYield": "0",
+      "claimValue": "9999999998"
+    },
+    "after": {
+      "raw": "0",
+      "claims": "0",
+      "poolShares": "10089947394009747",
+      "supply": "10089947394009747",
+      "idle": "0",
+      "strategyShares": "9988788843",
+      "rate": "1010127208674647155365377435",
+      "pendingYield": "0",
+      "claimValue": "10089947392"
+    }
+  }
+]

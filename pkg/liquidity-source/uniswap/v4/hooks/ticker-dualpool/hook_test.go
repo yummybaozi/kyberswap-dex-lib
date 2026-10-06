@@ -78,3 +78,26 @@ func TestHookCloneAndVaultRefresh(t *testing.T) {
 	q.Swap.Balance0.Clear()
 	require.False(t, h.State.Pool.Balance0.IsZero(), "UpdateBalance must not retain mutable quote pointers")
 }
+
+func TestCloneAccountingDoesNotSharePointers(t *testing.T) {
+	h := &Hook{Snapshot: Snapshot{State: fixtureState()}}
+	for i := 0; i < 2; i++ {
+		h.Raw[i] = uint256.NewInt(1)
+		h.Claims[i] = uint256.NewInt(2)
+		h.ManagerCash[i] = uint256.NewInt(3)
+		h.Limits[i] = &AaveLimits{uint256.NewInt(4), uint256.NewInt(5)}
+	}
+	clone := h.CloneState().(*Hook)
+	for i := 0; i < 2; i++ {
+		clone.Raw[i].Clear()
+		clone.Claims[i].Clear()
+		clone.ManagerCash[i].Clear()
+		clone.Limits[i].MaxDeposit.Clear()
+		clone.Limits[i].MaxWithdraw.Clear()
+		require.Equal(t, uint64(1), h.Raw[i].Uint64())
+		require.Equal(t, uint64(2), h.Claims[i].Uint64())
+		require.Equal(t, uint64(3), h.ManagerCash[i].Uint64())
+		require.Equal(t, uint64(4), h.Limits[i].MaxDeposit.Uint64())
+		require.Equal(t, uint64(5), h.Limits[i].MaxWithdraw.Uint64())
+	}
+}
