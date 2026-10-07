@@ -124,3 +124,21 @@ The portable export → load → tracker sequence has passed. The loader refuses
 - Verify Kyber's actual transaction encoding, hook data, settlement timing and use of shared route inventory. Execute both directions and reverse-requested quotes against that executor.
 - Measure actual executor gas and Monad billing; verify extra configurations, especially two wrapped sides, before treating their gas allowance as measured.
 - A live deployment/transaction fixture and Kyber PR submission require subsequent user authorization. Neither is part of the completed local evidence above.
+
+## Go quotes consumed by the real Kyber executor
+
+The additional `TestExecutorBridge` is opt-in. The Ticker-side runner exports a fresh
+Monad-fork pool snapshot, starts a loopback Anvil, then supplies `KYBER_BRIDGE_REQUEST`,
+`KYBER_BRIDGE_RESPONSE` and `KYBER_LOCAL_RPC`. The test runs the real tracker and V4
+simulator and returns output, fees and predicted reserves/price before any swap executes.
+It also quotes repeated-pool and shared-Aave routes using `UpdateBalance` and shared
+inventory. Ordinary Go tests skip this bridge; they do not prove executor compatibility.
+
+The companion Ticker harness is on `codex/kyber-quote-execution` in ponsfamily; see its
+`docs/kyber-quote-execution.md` for exact commands, assertions and limitations. A local
+signer is authorized only on the fork. It does not obtain Kyber production signatures.
+
+Fresh staged deployments exposed an overly strict proxy check: compiler metadata changed
+while proxy instructions did not. The tracker now fingerprints the exact executable
+ERC-1967 proxy instructions, while retaining implementation, PoolManager, strategy and
+accounting validation. Regression tests accept changed metadata and reject changed code.

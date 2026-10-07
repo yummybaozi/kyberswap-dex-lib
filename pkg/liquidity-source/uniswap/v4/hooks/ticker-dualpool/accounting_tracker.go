@@ -3,6 +3,7 @@ package tickerdualpool
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"math/big"
 	"strings"
 
@@ -74,8 +75,8 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	if crypto.Keccak256Hash(proxyCode) != common.HexToHash("0xd92d6ae2d5a8173e93af76e91088306cbb8d64a40d754444716411aedaeb3279") {
-		return nil, ErrInvalidState
+	if !tickerProxyFingerprint.matches(proxyCode) {
+		return nil, fmt.Errorf("hook proxy bytecode: %w", ErrInvalidState)
 	}
 	var poolManager common.Address
 	managerRequest := p.RpcClient.NewRequest().SetContext(ctx).SetBlockNumber(p.BlockNumber).SetOverrides(p.Overrides)
@@ -84,7 +85,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 		return nil, err
 	}
 	if poolManager != monadPoolManager {
-		return nil, ErrInvalidState
+		return nil, fmt.Errorf("PoolManager address: %w", ErrInvalidState)
 	}
 	slot, err := storageAt(ctx, p, h.address, implementationSlot)
 	if err != nil {
@@ -95,7 +96,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 		return nil, err
 	}
 	if !tickerHookFingerprint.matches(code) {
-		return nil, ErrInvalidState
+		return nil, fmt.Errorf("hook implementation: %w", ErrInvalidState)
 	}
 	var config uniswapv4.StaticExtra
 	if err := json.Unmarshal([]byte(p.Pool.StaticExtra), &config); err != nil {
@@ -156,7 +157,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 			return nil, err
 		}
 		if !tickerVaultFingerprint.matches(code) {
-			return nil, ErrInvalidState
+			return nil, fmt.Errorf("vault implementation: %w", ErrInvalidState)
 		}
 		shareWord, err := storageAt(ctx, p, h.address, mapSlot(4))
 		if err != nil {
@@ -175,18 +176,18 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 			return nil, err
 		}
 		if asset != currency {
-			return nil, ErrInvalidState
+			return nil, fmt.Errorf("vault asset: %w", ErrInvalidState)
 		}
 		expected, ok := stataProxyHashes[strategy]
 		if !ok {
-			return nil, ErrInvalidState
+			return nil, fmt.Errorf("unrecognized strategy: %w", ErrInvalidState)
 		}
 		code, err = codeAt(ctx, p, strategy)
 		if err != nil {
 			return nil, err
 		}
 		if crypto.Keccak256Hash(code) != expected {
-			return nil, ErrInvalidState
+			return nil, fmt.Errorf("strategy proxy bytecode: %w", ErrInvalidState)
 		}
 		implementation, err := storageAt(ctx, p, strategy, implementationSlot)
 		if err != nil {
@@ -197,7 +198,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 			return nil, err
 		}
 		if crypto.Keccak256Hash(code) != stataImplementationHash {
-			return nil, ErrInvalidState
+			return nil, fmt.Errorf("strategy implementation: %w", ErrInvalidState)
 		}
 		var held, rate, maxDeposit, maxWithdraw *big.Int
 		request = p.RpcClient.NewRequest().SetContext(ctx).SetBlockNumber(p.BlockNumber).SetOverrides(p.Overrides)
@@ -224,7 +225,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 			expectedTotal = candidate.Total1
 		}
 		if total.Cmp(expectedTotal) != 0 {
-			return nil, ErrInvalidState
+			return nil, fmt.Errorf("pool share valuation: %w", ErrInvalidState)
 		}
 		reserve, err := readAaveReserve(ctx, p, strategy, currency, inventory.Rate)
 		if err != nil {
@@ -239,7 +240,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 			return nil, err
 		}
 		if depositLimit.ToBig().Cmp(maxDeposit) != 0 || withdrawalLimit.ToBig().Cmp(maxWithdraw) != 0 {
-			return nil, ErrInvalidState
+			return nil, fmt.Errorf("Aave native limits: %w", ErrInvalidState)
 		}
 		candidate.Reserves[side] = reserve
 		candidate.Aave[side] = inventory
