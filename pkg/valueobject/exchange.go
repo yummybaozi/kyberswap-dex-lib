@@ -334,6 +334,7 @@ const (
 	ExchangeUniswapV4Doppler            = "uniswap-v4-doppler"
 	ExchangeUniswapV4DualPool           = "uniswap-v4-dualpool"
 	ExchangeUniswapV4TickerDualPool     = "uniswap-v4-ticker-dualpool"
+	ExchangeUniswapV4TickerMemeHook     = "uniswap-v4-ticker-memehook"
 	ExchangeUniswapV4Euler              = "uniswap-v4-euler"
 	ExchangeUniswapV4EulerV2            = "uniswap-v4-euler-v2"
 	ExchangeUniswapV4EVPLUSAI           = "uniswap-v4-evplusai"

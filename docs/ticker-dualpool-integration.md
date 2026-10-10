@@ -217,3 +217,10 @@ also passed. Formatting and serialization regeneration produced no source change
 [Exact quote and validation evidence](../pkg/liquidity-source/uniswap/v4/hooks/ticker-dualpool/testdata/mainnet-executor.json)
 is included under the nested testdata module, excluded from downstream downloads.
 Subsequent changes add only this documentation and evidence, not Go code.
+
+## Companion meme-hook model
+
+The separate [TickerMemeHook integration](ticker-memehook-integration.md) adds
+classic V4 pool output-fee simulation. It preserves this DualPool model's
+accounting, Aave shared inventory and gas logic. Both production hook addresses
+remain unregistered. The companion foundation runner now tests both venues.
