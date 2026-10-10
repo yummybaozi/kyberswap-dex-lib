@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-10",
+  "kyberBase": "e3b08f15cd94d9bfafc393c9014e0d1cb787e011",
+  "goCommit": "82fba4445d0169a1370d1cf276a024a2f353b406",
+  "testedHarnessCommit": "eb8284b48e8c5b3f8737d8f0029eb6203f96e97f",
+  "harnessEvidenceCommit": "4e1c2c0c107ef8793d1071902bb47503f5eae634",
+  "checks": [
+    {
+      "command": "CI=true go test ./pkg/liquidity-source/uniswap/v4/... ./pkg/msgpack ./pkg/pooltypes ./pkg/test -count=1",
+      "exitCode": 0,
+      "passedPackages": 36,
+      "logSha256": "9323906095135d164f9c670d46e47775abaad3a4adc63dd213040b47bf85e3b2",
+      "scope": "Offline tests; existing remote and unconfigured executor bridge tests skip."
+    },
+    {
+      "command": "CI=true go test -race ./pkg/liquidity-source/uniswap/v4/hooks/ticker-memehook ./pkg/liquidity-source/uniswap/v4/hooks/ticker-dualpool ./pkg/liquidity-source/uniswap/v4/hooks/dualpool -count=1",
+      "exitCode": 0,
+      "passedPackages": 3,
+      "logSha256": "cb16b25f856862656721401db3cfb5de081937039a775f0f805b0fe1bbeba823"
+    }
+  ],
+  "executorRun": "mainnet-executor.json",
+  "forkBlock": 112288351,
+  "forkCases": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0
+  },
+  "unchangedDualPoolSource": true,
+  "productionAddressesRegistered": false
+}

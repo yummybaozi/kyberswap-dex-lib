@@ -224,3 +224,22 @@ The separate [TickerMemeHook integration](ticker-memehook-integration.md) adds
 classic V4 pool output-fee simulation. It preserves this DualPool model's
 accounting, Aave shared inventory and gas logic. Both production hook addresses
 remain unregistered. The companion foundation runner now tests both venues.
+
+## Current deployed-hook checkpoint
+
+Both hook models passed through the deployed Kyber router/executor at Monad
+block **112288351**: **12 passed, 0 failed, 0 skipped**, six per venue.
+Tested Go code: `82fba4445d0169a1370d1cf276a024a2f353b406`; tested harness code:
+`eb8284b48e8c5b3f8737d8f0029eb6203f96e97f`. The companion
+[PR #199 evidence checkpoint](https://github.com/jaybutera/ponsfamily/tree/4e1c2c0c107ef8793d1071902bb47503f5eae634)
+includes the report; later documentation/evidence commits do not change tested code.
+
+[Complete executor evidence](../pkg/liquidity-source/uniswap/v4/hooks/ticker-memehook/testdata/mainnet-executor.json)
+and [Go check results](../pkg/liquidity-source/uniswap/v4/hooks/ticker-memehook/testdata/validation.json)
+record exact commands, source provenance, runtime pins and quote values.
+Meme execution covers buy/sell with tax 0 and 133 bps, repeated trades,
+simulated round trips in one transaction, reverse quotes in both directions,
+and one-unit overstated quote rollback. Input, output, separately rounded fees,
+price, tick and liquidity match exactly. Reverse quotes guarantee at least the
+request, not minimum input. DualPool pricing, Aave inventory and gas code are
+unchanged. Production address registration remains disabled.
