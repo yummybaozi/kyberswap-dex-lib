@@ -1,6 +1,14 @@
 # Ticker DualPool — local Kyber integration
 
-**Status:** local implementation and validation complete for review; live integration still requires the deployment checks below. No production Ticker address is registered, no mainnet contracts were deployed, and no external PR or branch was published. Working branch: `codex/ticker-dualpool-integration`.
+**Status:** review branch `codex/ticker-dualpool-submission` in
+[yummybaozi/kyberswap-dex-lib](https://github.com/yummybaozi/kyberswap-dex-lib).
+Based on upstream `main` commit `e3b08f15cd94d9bfafc393c9014e0d1cb787e011`.
+No upstream PR is opened by this work. No production hook address is registered;
+live activation still requires the checks below.
+
+The earlier pinned sources and measurements below remain historical evidence.
+The deployed-foundation validation section at the end records the current branch's
+execution checks.
 
 ## Pinned sources
 
@@ -52,7 +60,7 @@ For exact-input swaps, Ticker **takes fee tokens immediately**. The router later
 
 Normal `UpdateBalance` models a settled leg. The execution-aware local harness can use `UpdateBalanceWithoutSettlement` to test another swap before payment. It subtracts unbacked claims using actual PoolManager cash; existing cash may already cover some claims.
 
-**Kyber's production executor timing remains unverified.** The inspected [public adapter repository](https://github.com/KyberNetwork/ks-dex-adapter-lib/tree/afa5c6c29389918fd32e0e28817865d8da2cdf98) does not contain its Uniswap V4 adapter. The harness method does not automatically configure Kyber's production route builder. Verify the executor before enabling routes that reuse a pool without intermediate settlement.
+**Kyber service-generated route timing remains unverified.** The inspected [public adapter repository](https://github.com/KyberNetwork/ks-dex-adapter-lib/tree/afa5c6c29389918fd32e0e28817865d8da2cdf98) does not contain its Uniswap V4 adapter. The harness method does not automatically configure Kyber's production route builder. Verify the executor before enabling routes that reuse a pool without intermediate settlement.
 
 ## Local deployment and supported model
 
@@ -123,7 +131,7 @@ The portable export → load → tracker sequence has passed. The loader refuses
 - After an authorized Ticker deployment, register its verified hook address through `RegisterHooksFactory(NewHook, address)` and provide initialized pool keys to the existing V4 discovery/tracking pipeline. No address is invented or automatically enabled here.
 - Verify Kyber's actual transaction encoding, hook data, settlement timing and use of shared route inventory. Execute both directions and reverse-requested quotes against that executor.
 - Measure actual executor gas and Monad billing; verify extra configurations, especially two wrapped sides, before treating their gas allowance as measured.
-- A live deployment/transaction fixture and Kyber PR submission require subsequent user authorization. Neither is part of the completed local evidence above.
+- The deployed-foundation fixture described below retains the live hooks but creates the rest of its test state locally. No mainnet deployment or transaction, upstream PR, or production routing activation is part of this branch.
 
 ## Go quotes consumed by the real Kyber executor
 
@@ -142,3 +150,70 @@ Fresh staged deployments exposed an overly strict proxy check: compiler metadata
 while proxy instructions did not. The tracker now fingerprints the exact executable
 ERC-1967 proxy instructions, while retaining implementation, PoolManager, strategy and
 accounting validation. Regression tests accept changed metadata and reject changed code.
+
+
+## Deployed Monad foundation validation
+
+The review branch carries the complete updated internal #152 implementation,
+rebased onto upstream main `e3b08f15cd94d9bfafc393c9014e0d1cb787e011`.
+The production Go changes are in their actual Kyber paths; this branch does not
+include the contracts repository's patch/source review-bundle directory.
+
+The exact reviewed deployed implementation fingerprint is accepted in addition
+to the earlier fingerprint. Three transient SWEEPING_SLOT constants and one
+buyback event topic account for the normalized executable difference. A runtime
+fixture regression recovers the older fingerprint by replacing those constants,
+accepts both reviewed versions, and rejects mutated executable instructions.
+The deployed-code update does not change pricing calculations or storage layout.
+
+The fork fixture retains the following deployed contracts at block 112288351:
+
+| Contract | Address |
+| --- | --- |
+| Ticker DualPool hook proxy | `0x047ea2f55148b7601FDDe0d28588B55c09192ac4` |
+| Ticker DualPool implementation | `0x844A14BaE1B67DF6064bB87BA5Ff941DC02649e0` |
+| PoolManager | `0x188d586Ddcf52439676Ca21A244753fA19F9Ea8e` |
+
+The remaining stack is completed and tokens are launched only in the fork.
+Hook proxy addresses, implementation pointers and bytecode are checked unchanged.
+A test signer is authorized only in local fork storage. No transaction is sent to
+mainnet, and the fork-created token/pool addresses are not production registrations.
+
+The six scenarios cover buy/sell, a round trip in one transaction, a 5,000-USDC
+buy and full sale, repeated 1/100/1,000-USDC buys and partial sells, two pools
+sharing Aave USDC cash, and shortage/rollback/recovery. Successful execution must
+match Go output, complete input, fees, creator tax, reserves and price exactly.
+The shortage is deliberately created locally: available Aave cash drops from
+10,001 USDC to 9,996.112190 USDC after the first simulated leg. Go rejects the
+second pool; the attempted two-hop route must roll back both pools and trader
+balances. Restoring cash must allow the route to succeed.
+
+The [contracts harness](https://github.com/jaybutera/ponsfamily/tree/42a7286301bedf7558f036b87539a2caa0dd6aac)
+contains the state exporter, loopback Anvil bridge and executor runtime pins.
+From that checkout, with Foundry dependencies installed, reproduce using:
+
+```sh
+python3 tools/kyber/run-mainnet-go.py \
+  --kyber-checkout /absolute/path/to/this-kyber-checkout \
+  --fork-block 112288351
+```
+
+Run serially; the harness uses shared scratch files. An archive RPC can be supplied
+with `--fork-url`. The runner opts into FFI and ordinary Go tests skip the bridge.
+
+Our route encoder clears step amount bit 255 to use the current route's token
+credits; selecting balance-minus-one mode underpays from an initially empty
+executor. This encoder change belongs to the contracts harness, not the Go quote
+math. Kyber's production route builder must use equivalent handling and supply
+shared inventory for routes crossing pools backed by the same Aave reserve.
+Production service-generated routes, hook activation, finalized execution gas,
+Morpho/arbitrary strategies and the meme-hook Go model remain separate work.
+
+
+On October 10, 2026, all six deployed-foundation scenarios passed on this rebased
+Go implementation at commit `9a80312271f23f2188878d3a475c17ae5df3d2cb`:
+6 passed, 0 failed, 0 skipped. Full V4/msgpack tests and Ticker/DualPool race checks
+also passed. Formatting and serialization regeneration produced no source changes.
+[Exact quote and validation evidence](../pkg/liquidity-source/uniswap/v4/hooks/ticker-dualpool/testdata/mainnet-executor.json)
+is included under the nested testdata module, excluded from downstream downloads.
+Subsequent changes add only this documentation and evidence, not Go code.
