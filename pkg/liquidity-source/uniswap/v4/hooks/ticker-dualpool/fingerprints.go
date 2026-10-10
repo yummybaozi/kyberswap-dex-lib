@@ -10,3 +10,18 @@ var tickerVaultFingerprint = runtimeFingerprint{Size: 12044, Hash: common.HexToH
 // Same ERC1967Proxy executable in the original fixture and staged deployment.
 // Compiler metadata changes with source paths; the delegatecall/slot instructions must not.
 var tickerProxyFingerprint = runtimeFingerprint{Size: 77, Hash: common.HexToHash("0x3c04593ddc0d8247a804e8f554bee9d2e505540d3b0d4a567d4ff589c25498a6")}
+
+// Monad implementation 0x844A14BaE1B67DF6064bB87BA5Ff941DC02649e0.
+// Its executable differs from the original fingerprint only in the three
+// SWEEPING_SLOT constants and the PoolBuybackBurned event topic. Replacing those
+// with the old slot/topic reproduces tickerHookFingerprint exactly; swap math,
+// storage layout and immutable offsets are unchanged.
+var tickerMainnetHookFingerprint = runtimeFingerprint{
+	Size:             tickerHookFingerprint.Size,
+	Hash:             common.HexToHash("0x914b298a03e9ba9f6d28db4817d51a93353c969b5d543deb4a0426b26df1b57c"),
+	ImmutableOffsets: tickerHookFingerprint.ImmutableOffsets,
+}
+
+func matchesTickerHook(code []byte) bool {
+	return tickerHookFingerprint.matches(code) || tickerMainnetHookFingerprint.matches(code)
+}

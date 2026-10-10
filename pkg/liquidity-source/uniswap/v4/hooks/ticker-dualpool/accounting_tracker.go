@@ -95,7 +95,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	if !tickerHookFingerprint.matches(code) {
+	if !matchesTickerHook(code) {
 		return nil, fmt.Errorf("hook implementation: %w", ErrInvalidState)
 	}
 	var config uniswapv4.StaticExtra
