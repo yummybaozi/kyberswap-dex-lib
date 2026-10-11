@@ -33,7 +33,7 @@ calculation and snapshot reading.
 
 ## Contracts and activation
 
-Monad chain ID: 143. Fork block: **112288351**.
+Monad chain ID: 143.
 
 | Contract | Address |
 | --- | --- |
@@ -62,19 +62,5 @@ sequential state, shared cash, stale snapshots, clones and serialization.
 Captured fixture values live directly in the Go test files. `CI=true` skips
 upstream remote tests.
 
-Solidity/Python tooling and fork-only Go bridges live in the private
-[contracts harness](https://github.com/jaybutera/ponsfamily/tree/e068291086e8e32dfcba29268536f00b124ca8ef).
-With repository access, Foundry, an archive RPC and initialized submodules:
-
-```sh
-git checkout e068291086e8e32dfcba29268536f00b124ca8ef
-python3 tools/kyber/run-mainnet-go.py --kyber-checkout /absolute/path/to/this-checkout --venue ticker-dualpool --fork-block 112288351 --report-file deployments/kyber-dualpool-split-run.json
-```
-
-The [run report](https://github.com/jaybutera/ponsfamily/blob/codex/kyber-mainnet-tests/deployments/kyber-dualpool-split-run.json)
-pins Go/harness commits, bridge/runtime hashes, commands and quotes. Six cases
-cover buy/sell, a round trip, a large trade, repeated trades, shared Aave cash,
-and shortage/rollback/recovery. Go quotes precede deployed Kyber execution.
-Completion, launches, funding and signer authorization stay inside the fork.
 Fixture provenance remains in the
 [original evidence branch](https://github.com/yummybaozi/kyberswap-dex-lib/tree/39a2df390ed33dd8e8c56fc80072ec7961b8a005).
