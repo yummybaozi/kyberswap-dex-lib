@@ -13,6 +13,7 @@ import (
 
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/entity"
 	uniswapv3 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v3"
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/source/pool"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/bignumber"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
@@ -276,4 +277,12 @@ type HookPoolState struct {
 	SqrtPriceX96 uint256.Int
 	Liquidity    uint256.Int
 	Tick         int
+}
+
+type HookQuoteFunc func(pool.CalcAmountOutParams) (*pool.CalcAmountOutResult, error)
+
+// HookWithCalcAmountIn handles output fees whose separate rounding can make net
+// output decrease. Both callbacks are pure; the second omits the hook's fees.
+type HookWithCalcAmountIn interface {
+	CalcAmountIn(pool.CalcAmountInParams, HookQuoteFunc, HookQuoteFunc) (*pool.CalcAmountInResult, error)
 }
