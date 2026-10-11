@@ -13,11 +13,13 @@ import (
 
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/entity"
 	uniswapv3 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v3"
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/source/pool"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/util/bignumber"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
 
 type BeforeSwapParams struct {
+	Limit pool.SwapLimit
 	// CalcOut=false is CalcAmountIn, which reverses exact-in (swaps are always executed exact-in).
 	// Hooks must invert their exact-in fees then, NOT apply the contract's exact-out (amountSpecified > 0) branch.
 	CalcOut         bool
@@ -276,4 +278,19 @@ type HookPoolState struct {
 	SqrtPriceX96 uint256.Int
 	Liquidity    uint256.Int
 	Tick         int
+}
+
+// HookWithSwapLimit is optional. Hooks sharing external reserves can participate
+// in the route's inventory without changing existing hook implementations.
+type HookWithSwapLimit interface {
+	CalculateLimit() map[string]*big.Int
+	UpdateBalanceWithLimit(any, pool.SwapLimit)
+}
+
+type HookQuoteFunc func(pool.CalcAmountOutParams) (*pool.CalcAmountOutResult, error)
+
+// HookWithCalcAmountIn handles output fees whose separate rounding can make net
+// output decrease. Both callbacks are pure; the second omits the hook's fees.
+type HookWithCalcAmountIn interface {
+	CalcAmountIn(pool.CalcAmountInParams, HookQuoteFunc, HookQuoteFunc) (*pool.CalcAmountInResult, error)
 }

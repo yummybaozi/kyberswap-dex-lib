@@ -174,6 +174,7 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (swapResul
 
 	if p.hook.CanBeforeSwap(p.staticExtra.HooksAddress) {
 		if beforeSwapResult, err = p.hook.BeforeSwap(&BeforeSwapParams{
+			Limit:           param.Limit,
 			CalcOut:         true,
 			ZeroForOne:      zeroForOne,
 			AmountSpecified: amountIn,
@@ -233,6 +234,11 @@ func (p *PoolSimulator) CalcAmountOut(param pool.CalcAmountOutParams) (swapResul
 // CalcAmountIn reverses exact-in: hooks get CalcOut=false and must invert their exact-in fees,
 // not simulate on-chain exact-out, since the swap is always executed exact-in.
 func (p *PoolSimulator) CalcAmountIn(param pool.CalcAmountInParams) (swapResult *pool.CalcAmountInResult, err error) {
+	if reverse, ok := p.hook.(HookWithCalcAmountIn); ok {
+		plain := *p
+		plain.hook = &BaseHook{}
+		return reverse.CalcAmountIn(param, p.CalcAmountOut, plain.CalcAmountOut)
+	}
 	originalTokenOut, originalTokenIn := param.TokenAmountOut.Token, param.TokenIn
 	var wrapAdditionalGas int64
 	var beforeSwapResult *BeforeSwapResult
@@ -318,6 +324,7 @@ func (p *PoolSimulator) CalcAmountIn(param pool.CalcAmountInParams) (swapResult 
 
 	if p.hook.CanBeforeSwap(p.staticExtra.HooksAddress) {
 		if beforeSwapResult, err = p.hook.BeforeSwap(&BeforeSwapParams{
+			Limit:           param.Limit,
 			CalcOut:         false,
 			ZeroForOne:      zeroForOne,
 			AmountSpecified: amountOut,
@@ -467,7 +474,11 @@ func (p *PoolSimulator) UpdateBalance(params pool.UpdateBalanceParams) {
 		return
 	}
 	if p.hook != nil {
-		p.hook.UpdateBalance(v4SwapInfo.HookSwapInfo)
+		if limited, ok := p.hook.(HookWithSwapLimit); ok {
+			limited.UpdateBalanceWithLimit(v4SwapInfo.HookSwapInfo, params.SwapLimit)
+		} else {
+			p.hook.UpdateBalance(v4SwapInfo.HookSwapInfo)
+		}
 	}
 	params.SwapInfo = v4SwapInfo.PoolSwapInfo
 
@@ -583,4 +594,11 @@ func (s *PoolSimulator) SwapReceiveNativeIn(tokenIn, tokenOut string, _ valueobj
 func (s *PoolSimulator) SwapReturnNativeOut(tokenIn, tokenOut string, _ valueobject.ChainID) bool {
 	meta := s.GetMetaInfo(tokenIn, tokenOut).(PoolMetaInfo)
 	return meta.TokenOut == NativeTokenAddress
+}
+
+func (p *PoolSimulator) CalculateLimit() map[string]*big.Int {
+	if limited, ok := p.hook.(HookWithSwapLimit); ok {
+		return limited.CalculateLimit()
+	}
+	return nil
 }
