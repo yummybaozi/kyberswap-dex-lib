@@ -55,6 +55,48 @@ The README points on-chain encoding contributions to `ks-dex-adapter-lib`; this
 branch adds Go models and a test bridge. The existing deployed V4 adapter executes
 the tested routes, but this does not validate Kyber's production route builder.
 
+### Staging AGENTS.md comparison
+
+Also reviewed the requested
+[staging AGENTS.md](https://github.com/jaybutera/kyberswap-dex-lib-staging/blob/8a954853c26c8e7a799f810c1ec05e2da0165954/AGENTS.md).
+Staging `main` points to `8a954853c26c8e7a799f810c1ec05e2da0165954`. Its guidance
+matches the current upstream version except that upstream adds more explicit
+checked-multiply and sequential-rounding guidance in the MulDiv section.
+
+We follow the core simulator, accounting and test requirements: exact integer
+results, pure forward quotes, updates from saved swap results, independent mutable
+clones, shared inventory, pinned hook reads, serialization generation and fixture
+module exclusions. All changed Go files match the prescribed import formatting;
+the review found no changed-file use of `strings.ToLower(address.Hex/String())`
+in place of `hexutil.Encode(address[:])`. Parent metadata returns its stored
+`BlockNumber`; full production refresh consistency still needs pipeline validation.
+
+There are deliberate differences to explain in the upstream PR:
+
+- **Hook reuse and naming:** directories `hooks/ticker-dualpool` and
+  `hooks/ticker-memehook` use the existing V4 hook-plugin structure. Exchange names
+  are `uniswap-v4-ticker-dualpool` and `uniswap-v4-ticker-memehook`, while pool type,
+  lister, tracker and simulator factory remain `uniswap-v4`. This follows existing
+  hook wiring rather than the literal standalone-source directory/DexType recipe.
+- **Frozen terms:** the existing V4 hook schema persists meme fee/tax terms in
+  `Extra.HookExtra`, even though they are immutable once registered. They are
+  cached and never re-fetched after registration. This is a schema convention to
+  explain against the generic rule to put immutable metadata in `StaticExtra`.
+- **Registration:** the instructions call for factory wiring. Parent V4 factories
+  and serialization are wired, but deployed hook addresses remain unregistered
+  under this update's explicit activation-disabled requirement.
+- **Reverse quotes:** the generic instructions discuss exact-output capability.
+  Here `CalcAmountIn` reverses an exact-input execution, as documented by the
+  parent V4 interface. Confirm that behavior with Kyber; the test evidence covers
+  exact-input execution of the returned input, not genuine exact-output swaps.
+- **Open validation:** native-token coverage, final Monad gas calibration and the
+  full production discovery/tracker path have not passed this update's tests.
+  They must remain explicit scope limits rather than a blanket compliance claim.
+
+No performance benchmark or universal overflow audit is claimed by this review.
+The existing checked DualPool/Aave arithmetic and its invalid-state regressions
+are preserved; the meme model follows the parent V4 `big.Int` hook API.
+
 ## Exact source and execution checkpoints
 
 | Item | Commit/block |
