@@ -1,5 +1,8 @@
 # TickerMemeHook integration
 
+See the [combined test evidence and Kyber submission review](ticker-kyber-validation.md)
+for all twelve deployed-contract cases and the remaining upstream review requirements.
+
 Ticker's classic launches graduate into an ordinary Uniswap V4 pool. The V4
 simulator already prices its liquidity and updates its price and tick. This
 hook model reads frozen launch terms and subtracts the hook fee and creator

@@ -6,6 +6,9 @@ Based on upstream `main` commit `e3b08f15cd94d9bfafc393c9014e0d1cb787e011`.
 No upstream PR is opened by this work. No production hook address is registered;
 live activation still requires the checks below.
 
+See the [combined test evidence and Kyber submission review](ticker-kyber-validation.md)
+for the current twelve-case report, reproduction commands and remaining review gates.
+
 The earlier pinned sources and measurements below remain historical evidence.
 The deployed-foundation validation section at the end records the current branch's
 execution checks.
