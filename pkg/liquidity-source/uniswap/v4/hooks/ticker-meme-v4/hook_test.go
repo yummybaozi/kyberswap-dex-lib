@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/KyberNetwork/msgpack/v5"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/goccy/go-json"
 	"github.com/stretchr/testify/require"
@@ -77,6 +78,27 @@ func TestFactoryRejectsWrongChainAndMalformedExtra(t *testing.T) {
 		{Cfg: &uniswapv4.Config{ChainID: valueobject.ChainIDMonad}, HookAddress: HookAddress, HookExtra: uniswapv4.HookExtra(`{"r":`)},
 	} {
 		require.Error(t, NewHook(param).(*Hook).validate())
+	}
+}
+
+func TestMalformedExtraRemainsRejectedAfterMsgpack(t *testing.T) {
+	for _, suffix := range []string{`"f":65536}`, `"f":"bad"}`, `"f":100,"t":65536}`} {
+		raw := `{"impl":"` + ImplementationCodeHash.Hex() + `","r":true,` + suffix
+		h := NewHook(&uniswapv4.HookParam{
+			Cfg:         &uniswapv4.Config{ChainID: valueobject.ChainIDMonad},
+			HookAddress: HookAddress,
+			HookExtra:   uniswapv4.HookExtra(raw),
+		}).(*Hook)
+		require.Error(t, h.validate())
+		encoded, err := msgpack.Marshal(h)
+		require.NoError(t, err)
+		var restored Hook
+		require.NoError(t, msgpack.Unmarshal(encoded, &restored))
+		_, err = restored.AfterSwap(&uniswapv4.AfterSwapParams{
+			BeforeSwapParams: &uniswapv4.BeforeSwapParams{CalcOut: true},
+			AmountOut:        big.NewInt(10000),
+		})
+		require.Error(t, err, "serialization must not make partially decoded fees quotable")
 	}
 }
 

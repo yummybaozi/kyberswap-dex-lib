@@ -25,7 +25,12 @@ func NewHook(param *uniswapv4.HookParam) uniswapv4.Hook {
 	if param.Cfg == nil || param.Cfg.ChainID != valueobject.ChainIDMonad || param.HookAddress != HookAddress {
 		h.decodeErr = ErrUnsupportedDeployment
 	} else if len(param.HookExtra) > 0 {
-		h.decodeErr = param.HookExtra.Unmarshal(&h.Extra)
+		// Decode atomically: decodeErr is not serialized, so a partial decode
+		// must not retain a verified implementation hash and incomplete fees.
+		var extra Extra
+		if h.decodeErr = param.HookExtra.Unmarshal(&extra); h.decodeErr == nil {
+			h.Extra = extra
+		}
 	}
 	return h
 }
