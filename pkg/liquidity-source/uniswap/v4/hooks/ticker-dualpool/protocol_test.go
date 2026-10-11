@@ -2,7 +2,6 @@ package tickerdualpool
 
 import (
 	"encoding/json"
-	"os"
 	"strconv"
 	"testing"
 
@@ -13,8 +12,7 @@ import (
 )
 
 func TestDirectionalProtocolFeesMatchMonadFork(t *testing.T) {
-	raw, err := os.ReadFile("testdata/protocol-fees.json")
-	require.NoError(t, err)
+	raw := []byte(capturedProtocolFees)
 	var rows []map[string]string
 	require.NoError(t, json.Unmarshal(raw, &rows))
 	require.Len(t, rows, 4)
@@ -43,3 +41,11 @@ func TestDirectionalProtocolFeesMatchMonadFork(t *testing.T) {
 		})
 	}
 }
+
+// Captured contract results; preserved from protocol-fees.json.
+const capturedProtocolFees = `[
+{"direction":"true","input":"100000000","before0":"9999999999","before1":"1000000000000000000000000","initialPrice":"792359631301295627757723824548136721","initialTick":"322380","protocol":"4096250","net":"9791327569279233519990","fee":"99404340804865314923","tax":"49702170402432657461","price":"789260629333123021886236102138641953","tick":"322301"},
+{"direction":"true","input":"1000000000","before0":"9999999999","before1":"1000000000000000000000000","initialPrice":"792359631301295627757723824548136721","initialTick":"322380","protocol":"4096250","net":"94583926413983930413687","fee":"960242907756182034656","tax":"480121453878091017328","price":"762423366577184658169390427626484353","tick":"321609"},
+{"direction":"false","input":"1000000000000000000000","before0":"9999999999","before1":"1000000000000000000000000","initialPrice":"792359631301295627757723824548136721","initialTick":"322380","protocol":"4096250","net":"9814687","fee":"99641","tax":"49820","price":"792670453860477147870525853005265434","tick":"322387"},
+{"direction":"false","input":"100000000000000000000000","before0":"9999999999","before1":"1000000000000000000000000","initialPrice":"792359631301295627757723824548136721","initialTick":"322380","protocol":"4096250","net":"944791835","fee":"9591795","tax":"4795897","price":"823441887219447639037926344581738215","tick":"323149"}
+]`

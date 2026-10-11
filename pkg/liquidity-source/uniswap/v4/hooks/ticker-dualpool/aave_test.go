@@ -3,7 +3,6 @@ package tickerdualpool
 import (
 	"encoding/json"
 	"math/big"
-	"os"
 	"strconv"
 	"testing"
 
@@ -16,12 +15,10 @@ import (
 )
 
 func TestAaveRoundTripMatchesForkInventory(t *testing.T) {
-	raw, err := os.ReadFile("testdata/aave-inventory.json")
-	require.NoError(t, err)
+	raw := []byte(capturedAaveInventory)
 	var inv []struct{ Before, After map[string]string }
 	require.NoError(t, json.Unmarshal(raw, &inv))
-	raw, err = os.ReadFile("testdata/monad-quotes.json")
-	require.NoError(t, err)
+	raw = []byte(capturedMonadQuotes)
 	var quotes []map[string]string
 	require.NoError(t, json.Unmarshal(raw, &quotes))
 	for i, f := range quotes {
@@ -54,12 +51,10 @@ func TestAaveRoundTripMatchesForkInventory(t *testing.T) {
 }
 
 func TestAaveSequentialHookUpdatesMatchFork(t *testing.T) {
-	raw, err := os.ReadFile("testdata/aave-inventory.json")
-	require.NoError(t, err)
+	raw := []byte(capturedAaveInventory)
 	var inventories []struct{ Before, After map[string]string }
 	require.NoError(t, json.Unmarshal(raw, &inventories))
-	raw, err = os.ReadFile("testdata/monad-quotes.json")
-	require.NoError(t, err)
+	raw = []byte(capturedMonadQuotes)
 	var quotes []map[string]string
 	require.NoError(t, json.Unmarshal(raw, &quotes))
 	f := quotes[0]
@@ -137,3 +132,9 @@ func TestAaveZeroShareDepositLeavesCashAndDilutionUnchanged(t *testing.T) {
 	require.Equal(t, v.PendingYield.Dec(), next.PendingYield.Dec(), "failed nested deposit rolls back _accrue")
 	require.Equal(t, v.StrategyShares.Dec(), next.StrategyShares.Dec())
 }
+
+// Captured contract results; preserved from aave-inventory.json.
+const capturedAaveInventory = `[
+{"before":{"raw":"0","claims":"0","poolShares":"10000000000000000","supply":"10000000000000000","idle":"0","strategyShares":"9899743234","rate":"1010127208674647155365377435","pendingYield":"0","claimValue":"9999999999"},"after":{"raw":"0","claims":"99999998","poolShares":"9999999999995499","supply":"9999999999995499","idle":"0","strategyShares":"9899743233","rate":"1010127208674647155365377435","pendingYield":"0","claimValue":"9999999998"}},
+{"before":{"raw":"0","claims":"99999998","poolShares":"9999999999995499","supply":"9999999999995499","idle":"0","strategyShares":"9899743233","rate":"1010127208674647155365377435","pendingYield":"0","claimValue":"9999999998"},"after":{"raw":"0","claims":"0","poolShares":"10089947394009747","supply":"10089947394009747","idle":"0","strategyShares":"9988788843","rate":"1010127208674647155365377435","pendingYield":"0","claimValue":"10089947392"}}
+]`

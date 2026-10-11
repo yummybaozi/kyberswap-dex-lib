@@ -54,8 +54,8 @@ go generate ./pkg/msgpack/...
 
 Tests cover captured quotes, rounding, dust, range boundaries, Aave limits,
 sequential state, shared cash, stale snapshots, clones and serialization.
-Fixtures are read from disk and excluded from downstream module downloads by
-`testdata/go.mod`. `CI=true` skips upstream remote tests.
+Captured fixture values live directly in the Go test files. `CI=true` skips
+upstream remote tests.
 
 Solidity/Python tooling and fork-only Go bridges live in the private
 [contracts harness](https://github.com/jaybutera/ponsfamily/tree/e068291086e8e32dfcba29268536f00b124ca8ef).

@@ -2,7 +2,6 @@ package tickerdualpool
 
 import (
 	"encoding/json"
-	"os"
 	"strconv"
 	"testing"
 
@@ -26,8 +25,7 @@ func fixtureState() State {
 
 // Values come from an executed Ticker hook, not from another Go pricing function.
 func TestQuotesMatchTickerSolidity(t *testing.T) {
-	raw, err := os.ReadFile("testdata/quotes.json")
-	require.NoError(t, err)
+	raw := []byte(capturedQuotes)
 	var fixtures []map[string]string
 	require.NoError(t, json.Unmarshal(raw, &fixtures))
 	for _, f := range fixtures {
@@ -72,8 +70,7 @@ func TestFloorRejectsShortageAndUnbackedClaims(t *testing.T) {
 }
 
 func TestQuotesMatchFreshMonadAaveDeployment(t *testing.T) {
-	raw, err := os.ReadFile("testdata/monad-quotes.json")
-	require.NoError(t, err)
+	raw := []byte(capturedMonadQuotes)
 	var fixtures []map[string]string
 	require.NoError(t, json.Unmarshal(raw, &fixtures))
 	for _, f := range fixtures {
@@ -124,8 +121,7 @@ func TestReverseQuoteMatchesExhaustiveSmallInputs(t *testing.T) {
 // Unlike the fork snapshot test, each quote here uses only the balances and price
 // computed by the PREVIOUS Go quote. No intermediate Solidity state is injected.
 func TestSequentialQuotesMatchSolidity(t *testing.T) {
-	raw, err := os.ReadFile("testdata/sequential.json")
-	require.NoError(t, err)
+	raw := []byte(capturedSequential)
 	var fixtures []map[string]string
 	require.NoError(t, json.Unmarshal(raw, &fixtures))
 	s := fixtureState()
@@ -144,3 +140,29 @@ func TestSequentialQuotesMatchSolidity(t *testing.T) {
 		s.Pool.Tick = q.Swap.Tick
 	}
 }
+
+// Captured contract results; preserved from monad-quotes.json.
+const capturedMonadQuotes = `[
+{"direction":"true","input":"100000000","before0":"9999999999","before1":"1000000000000000000000000","initialPrice":"792359631301295627757723824548136721","initialTick":"322380","net":"9793771323500773836399","price":"789259855873233267524883977085169160","tick":"322301"},
+{"direction":"false","input":"1000000000000000000000","before0":"10099999996","before1":"990057084950760635699086","initialPrice":"789259855873233267524883977085169160","initialTick":"322301","net":"9901813","price":"789570989566107662032193314880092797","tick":"322309"}
+]`
+
+// Captured contract results; preserved from quotes.json.
+const capturedQuotes = `[
+{"side":"0","input":"1001","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"984","fee":"9","tax":"4","price":"79228162514264337593512840030","tick":"-1","after0":"1000000000000000000000999","after1":"999999999999999999999001"},
+{"side":"0","input":"1000000000000000000","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"983029613996445648","fee":"9979996081182189","tax":"4989998040591094","price":"79228131403970312680411917320","tick":"-1","after0":"1000000999999999999999998","after1":"999999002000391881781068"},
+{"side":"0","input":"100000000000000000000000","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"94588807137724631302192","fee":"960292458251011485301","tax":"480146229125505742650","price":"76234676296125791142139077264","tick":"-771","after0":"1099999999999999999999998","after1":"903970754174898851469856"},
+{"side":"0","input":"400000000000000000000000","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"339835144667195627262804","fee":"3450102991545133271703","tax":"1725051495772566635851","price":"68473276679631106898443301960","tick":"-2918","after0":"1399999999999999999999998","after1":"654989700845486672829640"},
+{"side":"1","input":"1001","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"984","fee":"9","tax":"4","price":"79228162514264337593575060642","tick":"0","after0":"999999999999999999999001","after1":"1000000000000000000000999"},
+{"side":"1","input":"1000000000000000000","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"983029613996445648","fee":"9979996081182189","tax":"4989998040591094","price":"79228193624570578500883667574","tick":"0","after0":"999999002000391881781068","after1":"1000000999999999999999998"},
+{"side":"1","input":"100000000000000000000000","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"94588807137724631302192","fee":"960292458251011485301","tax":"480146229125505742650","price":"82339193138355071565267811747","tick":"770","after0":"903970754174898851469856","after1":"1099999999999999999999998"},
+{"side":"1","input":"400000000000000000000000","before0":"1000000000000000000000000","before1":"1000000000000000000000000","net":"339835144667195627262805","fee":"3450102991545133271703","tax":"1725051495772566635851","price":"91672285010627273480439347422","tick":"2917","after0":"654989700845486672829640","after1":"1399999999999999999999998"}
+]`
+
+// Captured contract results; preserved from sequential.json.
+const capturedSequential = `[
+{"direction":"true","input":"50000000000000000000000","net":"48205072294339171296509","price":"77702599142401861968052161033","tick":"-389","after0":"1049999999999999999999998","after1":"951060840310315562135524"},
+{"direction":"false","input":"100000000000000000000000","net":"98266565977864051109609","price":"80813629766492595939775986809","tick":"396","after0":"950236988854960354203440","after1":"1051060840310315562135522"},
+{"direction":"true","input":"150000000000000000000000","net":"144721330368263208184293","price":"76234063429139383403323324315","tick":"-771","after0":"1100236988854960354203438","after1":"904135631814616873623549"},
+{"direction":"false","input":"200000000000000000000000","net":"196331793956899391531371","price":"82454854727345576460955769358","tick":"798","after0":"900915370624605641988848","after1":"1104135631814616873623547"}
+]`
