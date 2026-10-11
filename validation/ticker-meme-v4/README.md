@@ -20,7 +20,7 @@ trip, reverse quotes and rollback when output is overstated by one unit.
 Use fresh checkouts to reproduce:
 
 ```sh
-git clone --no-checkout https://github.com/14degrees/kyberswap-dex-lib.git ticker-meme-go
+git clone --no-checkout https://github.com/yummybaozi/kyberswap-dex-lib.git ticker-meme-go
 git -C ticker-meme-go checkout 087aaffa61b5fdd2d8538e2bad4700e4e9f66d6b
 git clone --no-checkout https://github.com/jaybutera/ponsfamily.git ticker-meme-harness
 git -C ticker-meme-harness checkout e068291086e8e32dfcba29268536f00b124ca8ef
@@ -39,6 +39,6 @@ Router gas values are Forge measurements; production Monad gas needs calibration
 
 The six Kyber scenarios use ERC-20 pairs. Native-token PoolManager coverage is
 retained in the integration's sixteen inline captured swaps, whose original
-[harness and raw captures](https://github.com/14degrees/kyberswap-dex-lib/tree/6849e5efe04f29a51f4c2885eb05ac040adeaf14/pkg/liquidity-source/uniswap/v4/hooks/ticker-meme-v4/testdata)
+[harness and raw captures](https://github.com/yummybaozi/kyberswap-dex-lib/tree/6849e5efe04f29a51f4c2885eb05ac040adeaf14/pkg/liquidity-source/uniswap/v4/hooks/ticker-meme-v4/testdata)
 are pinned separately at block `112361144`. These two execution layers are
 reported separately.
