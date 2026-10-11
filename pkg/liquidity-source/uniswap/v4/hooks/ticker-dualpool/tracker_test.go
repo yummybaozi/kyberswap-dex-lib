@@ -13,14 +13,17 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient/gethclient"
 	"github.com/goccy/go-json"
 	"github.com/stretchr/testify/require"
 
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/entity"
 	uniswapv4 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4"
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
 
-func TestBaseTrackerDecodesPinnedSnapshot(t *testing.T) {
+func TestTrackerPublishesPinnedSnapshot(t *testing.T) {
 	readABI := func(path string) abi.ABI {
 		b, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -106,4 +109,59 @@ func TestBaseTrackerDecodesPinnedSnapshot(t *testing.T) {
 	require.Equal(t, vault, next.Vaults[1])
 	require.Equal(t, s.Total1.Dec(), next.Total1.Dec())
 	require.Equal(t, s.Pool.Balance0.Dec(), next.State.Pool.Balance0.Dec())
+	// Exercise the full refresh with direct token balances and test-only bytecode.
+	oldProxy, oldHook := tickerProxyFingerprint, tickerHookFingerprint
+	tickerProxyFingerprint = runtimeFingerprint{Size: 1, Hash: crypto.Keccak256Hash([]byte{0x60})}
+	tickerHookFingerprint = tickerProxyFingerprint
+	t.Cleanup(func() { tickerProxyFingerprint, tickerHookFingerprint = oldProxy, oldHook })
+	implementation := common.HexToAddress("0x7890")
+	p.Overrides = map[common.Address]gethclient.OverrideAccount{
+		address:        {Code: []byte{0x60, 0, 0}, State: map[common.Hash]common.Hash{implementationSlot: common.BytesToHash(implementation.Bytes())}},
+		implementation: {Code: []byte{0x60, 0, 0}},
+	}
+	batches[1][3] = pack(tickerABI, "vaults", empty)
+	batches = append(batches, [][]byte{pack(accountingABI, "poolManager", monadPoolManager)},
+		[][]byte{pack(accountingABI, "balanceOf", s.Total0.ToBig())},
+		[][]byte{pack(accountingABI, "balanceOf", s.Total1.ToBig())})
+	calls = 0
+	p.Pool.BlockNumber = 100
+	raw, err = h.Track(context.Background(), p)
+	require.NoError(t, err)
+	require.Equal(t, len(batches), calls)
+	require.Equal(t, uint64(123), p.Pool.BlockNumber)
+	require.NoError(t, json.Unmarshal(raw, &next))
+	require.Equal(t, p.Pool.BlockNumber, next.BlockNumber)
+
+	oldFactory, exists := uniswapv4.HookFactories[address]
+	uniswapv4.RegisterHooksFactory(NewHook, address)
+	t.Cleanup(func() {
+		if exists {
+			uniswapv4.HookFactories[address] = oldFactory
+		} else {
+			delete(uniswapv4.HookFactories, address)
+		}
+	})
+	fetch := uniswapv4.FetchRPCResult{Liquidity: big.NewInt(0), TickSpacing: 10,
+		Slot0: uniswapv4.Slot0Data{SqrtPriceX96: s.Pool.SqrtPriceX96.ToBig(), Tick: big.NewInt(0), LpFee: 2000}, HookExtra: raw}
+	extra, err := json.Marshal(fetch.ToExtra([]uniswapv4.Tick{}))
+	require.NoError(t, err)
+	p.Pool.Extra = string(extra)
+	p.Pool.Reserves = entity.PoolReserves{s.Total0.Dec(), s.Total1.Dec()}
+	sim, err := uniswapv4.NewPoolSimulator(*p.Pool, valueobject.ChainIDMonad)
+	require.NoError(t, err)
+	require.Equal(t, uint64(123), sim.GetMetaInfo("0x1", "0x2").(uniswapv4.PoolMetaInfo).BlockNumber)
+
+	// A validation failure after the base reads must publish neither state nor block.
+	calls = 0
+	p.Pool.BlockNumber = 100
+	batches[2][0] = pack(accountingABI, "poolManager", empty)
+	batches[1][1] = pack(tickerABI, "launches", true, true, empty, empty, empty, empty, empty, uint16(50), uint16(3000), uint16(5000), uint16(101), uint16(300), false)
+	before, err := json.Marshal(h.Snapshot)
+	require.NoError(t, err)
+	_, err = h.Track(context.Background(), p)
+	require.ErrorIs(t, err, ErrInvalidState)
+	require.Equal(t, uint64(100), p.Pool.BlockNumber)
+	after, err := json.Marshal(h.Snapshot)
+	require.NoError(t, err)
+	require.JSONEq(t, string(before), string(after))
 }

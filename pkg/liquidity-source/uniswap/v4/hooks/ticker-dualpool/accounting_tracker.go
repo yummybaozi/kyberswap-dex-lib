@@ -247,8 +247,13 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 		candidate.Limits[side] = &AaveLimits{uint256.MustFromBig(maxDeposit), uint256.MustFromBig(maxWithdraw)}
 		candidate.ManagerCash[side] = uint256.MustFromBig(managerCash)
 	}
+	raw, err := json.Marshal(candidate.Snapshot)
+	if err != nil {
+		return nil, err
+	}
 	h.Snapshot = candidate.Snapshot
+	p.Pool.BlockNumber = candidate.BlockNumber
 	h.decodeErr = nil
 	h.refreshRequired = false
-	return json.Marshal(h.Snapshot)
+	return raw, nil
 }
