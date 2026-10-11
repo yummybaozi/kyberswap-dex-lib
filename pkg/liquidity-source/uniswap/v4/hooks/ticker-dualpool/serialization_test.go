@@ -1,4 +1,4 @@
-package msgpack
+package tickerdualpool_test
 
 import (
 	"math/big"
@@ -13,6 +13,7 @@ import (
 	v4 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4/hooks/dualpool"
 	ticker "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4/hooks/ticker-dualpool"
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/msgpack"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/source/pool"
 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
 )
@@ -45,9 +46,9 @@ func TestTickerDualPoolSerializationPreservesQuotes(t *testing.T) {
 	ep := entity.Pool{Address: "0x1", Type: v4.DexType, Tokens: []*entity.PoolToken{{Address: "0x0000000000000000000000000000000000000001", Decimals: 18}, {Address: "0x0000000000000000000000000000000000000002", Decimals: 18}}, Reserves: entity.PoolReserves{backing.Dec(), backing.Dec()}, Extra: string(extra), StaticExtra: string(static), BlockNumber: 123}
 	original, err := v4.NewPoolSimulator(ep, valueobject.ChainIDMonad)
 	require.NoError(t, err)
-	encoded, err := EncodePoolSimulatorsMap(map[string]pool.IPoolSimulator{ep.Address: original})
+	encoded, err := msgpack.EncodePoolSimulatorsMap(map[string]pool.IPoolSimulator{ep.Address: original})
 	require.NoError(t, err)
-	decoded, err := DecodePoolSimulatorsMap(encoded)
+	decoded, err := msgpack.DecodePoolSimulatorsMap(encoded)
 	require.NoError(t, err)
 	restored := decoded[ep.Address]
 	input := pool.TokenAmount{Token: ep.Tokens[0].Address, Amount: big.NewInt(1001)}

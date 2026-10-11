@@ -23,8 +23,8 @@ Quotes are pure; `UpdateBalance` consumes saved quote state and clones own their
 mutable data. The optional V4 shared-inventory interface passes `SwapLimit` so
 multiple pools see the same Aave cash, vault supply and PoolManager balances.
 Snapshots use the existing V4 `HookExtra` convention and preserve their block.
-The hook and interface-embedded `BaseHook` are registered for msgpack, including
-an existing Twofold simulator regression.
+The hook and interface-embedded `BaseHook` are registered for msgpack. The hook
+package tests that saving and loading preserves quotes and subsequent state updates.
 
 ## Contracts and activation
 
