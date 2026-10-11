@@ -29,11 +29,14 @@ type Extra struct {
 
 // SwapInfo carries the post-swap state from CalcAmountOut to UpdateBalance.
 type SwapInfo struct {
-	ZeroForOne   bool
-	AmountIn     *uint256.Int
-	AmountOut    *uint256.Int
-	SqrtPriceX96 *uint256.Int
-	Tick         int32
+	// Exact JIT balances before any ERC-4626 redeposit rounding.
+	Balance0, Balance1         *uint256.Int
+	Mint0, Mint1, Burn0, Burn1 *uint256.Int
+	ZeroForOne                 bool
+	AmountIn                   *uint256.Int
+	AmountOut                  *uint256.Int
+	SqrtPriceX96               *uint256.Int
+	Tick                       int32
 }
 
 type distributionEntry struct {
