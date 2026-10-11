@@ -1,0 +1,176 @@
+diff --git a/tools/kyber/go-bridges/ticker-dualpool/executor_bridge_test.go b/tools/kyber/go-bridges/ticker-dualpool/executor_bridge_test.go
+index 22f5635..4ccefd3 100644
+--- a/tools/kyber/go-bridges/ticker-dualpool/executor_bridge_test.go
++++ b/tools/kyber/go-bridges/ticker-dualpool/executor_bridge_test.go
+@@ -1,4 +1,4 @@
+-package tickerdualpool
++package tickerdualpool_test
+ 
+ import (
+ 	"context"
+@@ -16,6 +16,8 @@ import (
+ 
+ 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/entity"
+ 	v4 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4"
++	ticker "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4/hooks/ticker-dualpool"
++	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/msgpack"
+ 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/source/pool"
+ 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/swaplimit"
+ 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
+@@ -120,7 +122,7 @@ func TestExecutorBridge(t *testing.T) {
+ 		}
+ 		second, err := other.CalcAmountOut(params)
+ 		if err != nil {
+-			require.ErrorIs(t, err, ErrVaultIlliquid, "shared-cash rejection")
++			require.ErrorIs(t, err, ticker.ErrVaultIlliquid, "shared-cash rejection")
+ 			values["secondRejected"] = "1"
+ 			second = fresh // Preserve the stale quote to prove that trying it on-chain fails.
+ 		}
+@@ -135,7 +137,7 @@ func TestExecutorBridge(t *testing.T) {
+ }
+ 
+ func bridgeQuoteValues(result *pool.CalcAmountOutResult) map[string]string {
+-	q := result.SwapInfo.(v4.SwapInfo).HookSwapInfo.(Quote)
++	q := result.SwapInfo.(v4.SwapInfo).HookSwapInfo.(ticker.Quote)
+ 	return map[string]string{"output": result.TokenAmountOut.Amount.String(), "hookFee": q.HookFee.Dec(), "creatorTax": q.CreatorTax.Dec(), "reserve0": q.Swap.Balance0.Dec(), "reserve1": q.Swap.Balance1.Dec(), "sqrtPriceX96": q.Swap.SqrtPriceX96.Dec()}
+ }
+ 
+@@ -145,8 +147,8 @@ func bridgeSimulator(t *testing.T, client *ethrpc.Client, m BridgePool, block ui
+ 	static, err := json.Marshal(v4.StaticExtra{Fee: m.Fee, TickSpacing: int32(m.TickSpacing), HooksAddress: addr})
+ 	require.NoError(t, err)
+ 	p := entity.Pool{Address: strings.ToLower(m.PoolId), Type: v4.DexType, StaticExtra: string(static), BlockNumber: block, Tokens: []*entity.PoolToken{{Address: strings.ToLower(m.Token0), Swappable: true}, {Address: strings.ToLower(m.Token1), Swappable: true}}}
+-	param := &v4.HookParam{HookAddress: addr, BlockNumber: new(big.Int).SetUint64(block), RpcClient: client, Cfg: &v4.Config{StateViewAddress: "0x77395F3b2E73aE90843717371294fa97cC419D64"}, Pool: &p}
+-	h := NewHook(param).(*Hook)
++	param := &v4.HookParam{HookAddress: addr, BlockNumber: new(big.Int).SetUint64(block), RpcClient: client, Cfg: &v4.Config{ChainID: valueobject.ChainIDMonad, StateViewAddress: "0x77395F3b2E73aE90843717371294fa97cC419D64"}, Pool: &p}
++	h := ticker.NewHook(param).(*ticker.Hook)
+ 	raw, err := h.Track(context.Background(), param)
+ 	require.NoError(t, err, "track exact deployed accounting")
+ 	fetch := v4.FetchRPCResult{Liquidity: big.NewInt(0), TickSpacing: int32(m.TickSpacing), Slot0: v4.Slot0Data{SqrtPriceX96: h.Pool.SqrtPriceX96.ToBig(), Tick: big.NewInt(int64(h.Pool.Tick)), LpFee: h.Pool.LpFee, ProtocolFee: h.Pool.ProtocolFee}, HookExtra: raw}
+@@ -154,8 +156,15 @@ func bridgeSimulator(t *testing.T, client *ethrpc.Client, m BridgePool, block ui
+ 	require.NoError(t, err)
+ 	p.Extra = string(extra)
+ 	p.Reserves = entity.PoolReserves{h.Pool.Balance0.Dec(), h.Pool.Balance1.Dec()}
+-	v4.RegisterHooksFactory(NewHook, addr)
++	v4.RegisterHooksFactory(ticker.NewHook, addr)
+ 	sim, err := v4.NewPoolSimulator(p, valueobject.ChainIDMonad)
+ 	require.NoError(t, err)
+-	return sim
++	encoded, err := msgpack.EncodePoolSimulatorsMap(map[string]pool.IPoolSimulator{p.Address: sim})
++	require.NoError(t, err)
++	decoded, err := msgpack.DecodePoolSimulatorsMap(encoded)
++	require.NoError(t, err)
++	restored, ok := decoded[p.Address].(*v4.PoolSimulator)
++	require.True(t, ok)
++	require.Equal(t, block, restored.Info.BlockNumber, "saved quote metadata uses the validated snapshot block")
++	return restored
+ }
+diff --git a/tools/kyber/go-bridges/ticker-memehook/executor_bridge_test.go b/tools/kyber/go-bridges/ticker-memehook/executor_bridge_test.go
+index 5df0ad1..0f3c903 100644
+--- a/tools/kyber/go-bridges/ticker-memehook/executor_bridge_test.go
++++ b/tools/kyber/go-bridges/ticker-memehook/executor_bridge_test.go
+@@ -1,4 +1,4 @@
+-package tickermemehook
++package tickermemev4_test
+ 
+ import (
+ 	"context"
+@@ -17,6 +17,8 @@ import (
+ 
+ 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/entity"
+ 	v4 "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4"
++	ticker "github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4/hooks/ticker-meme-v4"
++	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/msgpack"
+ 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/source/pool"
+ 	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/valueobject"
+ )
+@@ -81,8 +83,8 @@ func TestExecutorBridge(t *testing.T) {
+ 		require.NoError(t, err)
+ 		fee, tax := new(big.Int), new(big.Int)
+ 		if terms.Registered {
+-			fee.Div(fee.Mul(gross.TokenAmountOut.Amount, big.NewInt(int64(terms.HookFeeBps))), big.NewInt(basisPoints))
+-			tax.Div(tax.Mul(gross.TokenAmountOut.Amount, big.NewInt(int64(terms.CreatorTaxBps))), big.NewInt(basisPoints))
++			fee.Div(fee.Mul(gross.TokenAmountOut.Amount, big.NewInt(int64(terms.HookFeeBps))), big.NewInt(10_000))
++			tax.Div(tax.Mul(gross.TokenAmountOut.Amount, big.NewInt(int64(terms.CreatorTaxBps))), big.NewInt(10_000))
+ 		}
+ 		require.Equal(t, new(big.Int).Sub(gross.TokenAmountOut.Amount, new(big.Int).Add(fee, tax)).String(), result.TokenAmountOut.Amount.String())
+ 		si := result.SwapInfo.(v4.SwapInfo)
+@@ -113,27 +115,19 @@ func TestExecutorBridge(t *testing.T) {
+ 	require.NoError(t, os.WriteFile(os.Getenv("KYBER_BRIDGE_RESPONSE"), response, 0600))
+ }
+ 
+-func bridgeSimulator(t *testing.T, client *ethrpc.Client, m bridgeRequest) (*v4.PoolSimulator, *v4.PoolSimulator, Extra) {
++func bridgeSimulator(t *testing.T, client *ethrpc.Client, m bridgeRequest) (*v4.PoolSimulator, *v4.PoolSimulator, ticker.Extra) {
+ 	t.Helper()
+ 	address := common.HexToAddress(m.Hook)
+-	old, existed := v4.HookFactories[address]
+-	v4.RegisterHooksFactory(NewHook, address)
+-	t.Cleanup(func() {
+-		if existed {
+-			v4.HookFactories[address] = old
+-		} else {
+-			delete(v4.HookFactories, address)
+-		}
+-	})
++	require.Equal(t, ticker.HookAddress, address, "use the registered deployed hook")
+ 	static := v4.StaticExtra{Fee: m.Fee, TickSpacing: int32(m.TickSpacing), HooksAddress: address}
+ 	rawStatic, err := json.Marshal(static)
+ 	require.NoError(t, err)
+-	ep := entity.Pool{Address: strings.ToLower(m.PoolID), Exchange: string(Exchange), Type: v4.DexType, StaticExtra: string(rawStatic), BlockNumber: m.Block, Tokens: []*entity.PoolToken{{Address: strings.ToLower(m.Token0), Swappable: true}, {Address: strings.ToLower(m.Token1), Swappable: true}}}
++	ep := entity.Pool{Address: strings.ToLower(m.PoolID), Exchange: ticker.DexType, Type: v4.DexType, StaticExtra: string(rawStatic), BlockNumber: m.Block, Tokens: []*entity.PoolToken{{Address: strings.ToLower(m.Token0), Swappable: true}, {Address: strings.ToLower(m.Token1), Swappable: true}}}
+ 	block := new(big.Int).SetUint64(m.Block)
+-	param := &v4.HookParam{HookAddress: address, BlockNumber: block, RpcClient: client, Pool: &ep}
+-	rawTerms, err := NewHook(param).Track(context.Background(), param)
++	param := &v4.HookParam{Cfg: &v4.Config{ChainID: valueobject.ChainIDMonad}, HookAddress: address, BlockNumber: block, RpcClient: client, Pool: &ep}
++	rawTerms, err := ticker.NewHook(param).Track(context.Background(), param)
+ 	require.NoError(t, err)
+-	var terms Extra
++	var terms ticker.Extra
+ 	require.NoError(t, json.Unmarshal(rawTerms, &terms))
+ 	require.True(t, terms.Registered)
+ 	a, err := abi.JSON(strings.NewReader(bridgeStateABI))
+@@ -165,6 +159,13 @@ func bridgeSimulator(t *testing.T, client *ethrpc.Client, m bridgeRequest) (*v4.
+ 	ep.Reserves = entity.PoolReserves{r0.String(), r1.String()}
+ 	sim, err := v4.NewPoolSimulator(ep, valueobject.ChainIDMonad)
+ 	require.NoError(t, err)
++	// Quotes must survive the save/load path before the real Kyber execution.
++	encoded, err := msgpack.EncodePoolSimulatorsMap(map[string]pool.IPoolSimulator{ep.Address: sim})
++	require.NoError(t, err)
++	decoded, err := msgpack.DecodePoolSimulatorsMap(encoded)
++	require.NoError(t, err)
++	sim = decoded[ep.Address].(*v4.PoolSimulator)
++	require.Equal(t, ticker.DexType, sim.GetExchange())
+ 	static.HooksAddress = common.Address{}
+ 	rawStatic, err = json.Marshal(static)
+ 	require.NoError(t, err)
+diff --git a/tools/kyber/quote-snapshot.py b/tools/kyber/quote-snapshot.py
+index 847ec4f..fc99c09 100644
+--- a/tools/kyber/quote-snapshot.py
++++ b/tools/kyber/quote-snapshot.py
+@@ -79,10 +79,11 @@ with tempfile.TemporaryDirectory(prefix='kyber-go-') as tmp:
+             # Supply fork-only Go tests from this harness without changing the
+             # Kyber checkout or including bridge code in its upstream PR.
+             overlay=Path(tmp)/'overlay.json'
+-            virtual=checkout/'pkg/liquidity-source/uniswap/v4/hooks'/venue/'executor_bridge_test.go'
++            package='ticker-meme-v4' if venue == 'ticker-memehook' else venue
++            virtual=checkout/'pkg/liquidity-source/uniswap/v4/hooks'/package/'executor_bridge_test.go'
+             bridge=root/'tools/kyber/go-bridges'/venue/'executor_bridge_test.go'
+             overlay.write_text(json.dumps({'Replace':{str(virtual):str(bridge)}}))
+-            run=subprocess.run(['go','test','-overlay='+str(overlay),'./pkg/liquidity-source/uniswap/v4/hooks/'+venue,'-run','^TestExecutorBridge$','-count=1','-v'],cwd=checkout,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
++            run=subprocess.run(['go','test','-overlay='+str(overlay),'./pkg/liquidity-source/uniswap/v4/hooks/'+package,'-run','^TestExecutorBridge$','-count=1','-v'],cwd=checkout,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+             if run.returncode: print(run.stdout,file=sys.stderr)
+             if run.returncode: raise RuntimeError('Go tracker/quote failed')
+             quote=json.loads(response.read_text())
+diff --git a/tools/kyber/run-mainnet-go.py b/tools/kyber/run-mainnet-go.py
+index b54f5ca..ce607f5 100644
+--- a/tools/kyber/run-mainnet-go.py
++++ b/tools/kyber/run-mainnet-go.py
+@@ -42,7 +42,8 @@ if args.match_test:
+     tests = [args.match_test]
+ venues = sorted({test_venue(test) for test in tests})
+ for venue in venues:
+-    if not (checkout / 'pkg/liquidity-source/uniswap/v4/hooks' / venue / 'hook.go').is_file():
++    package = 'ticker-meme-v4' if venue == 'ticker-memehook' else venue
++    if not (checkout / 'pkg/liquidity-source/uniswap/v4/hooks' / package / 'hook.go').is_file():
+         parser.error('Checkout must contain the selected hook: ' + venue)
+ block = args.fork_block or int(subprocess.check_output(['cast', 'block-number', '--rpc-url', args.fork_url], text=True))
+ if block <= 0:

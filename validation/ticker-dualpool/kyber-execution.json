@@ -1,0 +1,615 @@
+{
+  "forkBlock": 112288351,
+  "venues": [
+    "ticker-dualpool"
+  ],
+  "harnessCommit": "e068291086e8e32dfcba29268536f00b124ca8ef",
+  "harnessPatchSha256": "d0d09c9c96a9aefe84c555768a14501755f3ec1aba7982ce23959cf4bfbf3f8e",
+  "goCommit": "a5ccad0f99f5b90c45b1dc613d062f4c866573ef",
+  "goWorktreeChanges": "",
+  "bridgeSourceSha256": {
+    "ticker-dualpool": "492fce4e5d065f5e80f7d6492cf1780284c35d00367d6180daa06be3de704df3"
+  },
+  "goPatchSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "codePins": [
+    {
+      "chainId": 143,
+      "block": 111136692,
+      "contracts": [
+        {
+          "name": "router",
+          "address": "0x6131b5fae19ea4f9d964eac0408e4408b66337b5",
+          "codeHash": "0x73055c10f463ef7d44c444ccae0b71ab4cacaf67aedbad2cd8af639d53cc6316"
+        },
+        {
+          "name": "executor",
+          "address": "0x8f10b468b06c6fd214b65f87778827f7d113f996",
+          "codeHash": "0xc3fe18bd9e1e31adecfcaba58177f3d796c3028e7d53a628e321e18295e10682"
+        },
+        {
+          "name": "implementation",
+          "address": "0x4f1423cce26c09fb31d96eafe702fc5e22421f6a",
+          "codeHash": "0xb80c4905fac58dc691098cf3df4fedccb13ece3006eaf4f57fde8d3057da1a9f"
+        },
+        {
+          "name": "adapter",
+          "address": "0x069c11bfc769be175bfae2d20bddce34e46514cc",
+          "codeHash": "0x545e3011d035ba82f8d6606cccafb94409fc4b6ef530d1e08f4933d788f9a356"
+        },
+        {
+          "name": "callback",
+          "address": "0x7b0e2e8300899b647d5ebc66f9d4fa3f16c54061",
+          "codeHash": "0x2341b9d149017244dde869c1ddaabf0ff7f7b0eb53b6f3af6ac4564b536ed6e0"
+        }
+      ]
+    },
+    {
+      "chainId": 143,
+      "block": 112288351,
+      "contracts": [
+        {
+          "name": "DualPool proxy",
+          "address": "0x047ea2f55148b7601fdde0d28588b55c09192ac4",
+          "codeHash": "0x824a513357c89e28b2b23a5d727a23bdb3b69db732883d999165af4e064e3120"
+        },
+        {
+          "name": "DualPool implementation",
+          "address": "0x844a14bae1b67df6064bb87ba5ff941dc02649e0",
+          "codeHash": "0xc812006c87f88e3056cc31a5bb39a4b64fa011a23c718923f29f949f53b55eb0"
+        },
+        {
+          "name": "Meme proxy",
+          "address": "0x223f8b1b43aeec86d2659cce36169f72f7fc2044",
+          "codeHash": "0x824a513357c89e28b2b23a5d727a23bdb3b69db732883d999165af4e064e3120"
+        },
+        {
+          "name": "Meme implementation",
+          "address": "0x2d96e4e89d37551ff55eb9cfead78da1278d5986",
+          "codeHash": "0x94a20f9305eeae246d3ec31488868fc17f81caf4a7ad2b05f528d04c55c4c382"
+        }
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "name": "test_GoDeployedFoundationBuyAndSell",
+      "passed": true,
+      "command": [
+        "forge",
+        "test",
+        "--ffi",
+        "--threads",
+        "1",
+        "--memory-limit",
+        "536870912",
+        "--gas-limit",
+        "64000000000",
+        "--match-contract",
+        "^KyberMainnetGoQuoteTest$",
+        "--match-test",
+        "^test_GoDeployedFoundationBuyAndSell\\(",
+        "-vv"
+      ],
+      "forgeRouterCallGas": [],
+      "quotes": [
+        {
+          "request": {
+            "aaveCash": 15998048076550,
+            "amountIn": "10000000",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048076550",
+            "creatorTax": "2706156398384866234858",
+            "hookFee": "2034704058935989650269",
+            "output": "198729545436278109141852",
+            "reserve0": "10009999998",
+            "reserve1": "203878162258829433103277892",
+            "sqrtPriceX96": "11307024519331663596078157969966452033"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 15998048076550,
+            "amountIn": "99364772718139054570926",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048076550",
+            "creatorTax": "64724",
+            "hookFee": "48664",
+            "output": "4753084",
+            "reserve0": "10005133524",
+            "reserve1": "203977527031547572157848816",
+            "sqrtPriceX96": "11312524239700024397304778019780366058"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test_GoDeployedFoundationRoundTrip",
+      "passed": true,
+      "command": [
+        "forge",
+        "test",
+        "--ffi",
+        "--threads",
+        "1",
+        "--memory-limit",
+        "536870912",
+        "--gas-limit",
+        "64000000000",
+        "--match-contract",
+        "^KyberMainnetGoQuoteTest$",
+        "--match-test",
+        "^test_GoDeployedFoundationRoundTrip\\(",
+        "-vv"
+      ],
+      "forgeRouterCallGas": [],
+      "quotes": [
+        {
+          "request": {
+            "aaveCash": 15998048076550,
+            "amountIn": "10000000",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": true,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048076550",
+            "creatorTax": "2706156398384866234858",
+            "hookFee": "2034704058935989650269",
+            "output": "198729545436278109141852",
+            "reserve0": "10009999998",
+            "reserve1": "203878162258829433103277892",
+            "second_creatorTax": "129385",
+            "second_hookFee": "97282",
+            "second_output": "9501549",
+            "second_reserve0": "10000271780",
+            "second_reserve1": "204076891804265711212419742",
+            "second_sqrtPriceX96": "11318023960068385198531398069594280083",
+            "sqrtPriceX96": "11307024519331663596078157969966452033"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test_GoDeployedFoundationLargeTrade",
+      "passed": true,
+      "command": [
+        "forge",
+        "test",
+        "--ffi",
+        "--threads",
+        "1",
+        "--memory-limit",
+        "536870912",
+        "--gas-limit",
+        "64000000000",
+        "--match-contract",
+        "^KyberMainnetGoQuoteTest$",
+        "--match-test",
+        "^test_GoDeployedFoundationLargeTrade\\(",
+        "-vv"
+      ],
+      "forgeRouterCallGas": [],
+      "quotes": [
+        {
+          "request": {
+            "aaveCash": 15998048076550,
+            "amountIn": "5000000000",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048076550",
+            "creatorTax": "903554750689575344340924",
+            "hookFee": "679364474202688228827762",
+            "output": "66353528195376559309607567",
+            "reserve0": "14999999998",
+            "reserve1": "136145185244454209185528617",
+            "sqrtPriceX96": "7550573002139292093381732783644556713"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 15998048076550,
+            "amountIn": "66353528195376559309607567",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048076550",
+            "creatorTax": "65239447",
+            "hookFee": "49052216",
+            "output": "4790929954",
+            "reserve0": "10094778379",
+            "reserve1": "202498713439830768495136182",
+            "sqrtPriceX96": "11223160786817403275592874558944367291"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test_GoDeployedFoundationRepeatedTrades",
+      "passed": true,
+      "command": [
+        "forge",
+        "test",
+        "--ffi",
+        "--threads",
+        "1",
+        "--memory-limit",
+        "536870912",
+        "--gas-limit",
+        "64000000000",
+        "--match-contract",
+        "^KyberMainnetGoQuoteTest$",
+        "--match-test",
+        "^test_GoDeployedFoundationRepeatedTrades\\(",
+        "-vv"
+      ],
+      "forgeRouterCallGas": [],
+      "quotes": [
+        {
+          "request": {
+            "aaveCash": 15998048076550,
+            "amountIn": "1000000",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048076550",
+            "creatorTax": "270858682550500699840",
+            "hookFee": "203653144774812556270",
+            "output": "19890802650155942370986",
+            "reserve0": "10000999998",
+            "reserve1": "204061267350245550812677774",
+            "sqrtPriceX96": "11317179475289228306153546549113968381"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 15998048076550,
+            "amountIn": "9945401325077971185493",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048076550",
+            "creatorTax": "6469",
+            "hookFee": "4864",
+            "output": "475090",
+            "reserve0": "10000513573",
+            "reserve1": "204071212751570628783863265",
+            "sqrtPriceX96": "11317729941261653093062190096622959210"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 15998048590124,
+            "amountIn": "100000000",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048590124",
+            "creatorTax": "26818168458046951736791",
+            "hookFee": "20164036434621768223151",
+            "output": "1969421438569508102355194",
+            "reserve0": "10100513570",
+            "reserve1": "202054809108108451961548128",
+            "sqrtPriceX96": "11205900783285007885463686151422934957"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 15998048590124,
+            "amountIn": "984710719284754051177597",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998048590124",
+            "creatorTax": "650203",
+            "hookFee": "488874",
+            "output": "47748403",
+            "reserve0": "10051626087",
+            "reserve1": "203039519827393206012725723",
+            "sqrtPriceX96": "11260403329044306783220154049924056445"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 15998099702640,
+            "amountIn": "1000000000",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998099702640",
+            "creatorTax": "243904181877418679815866",
+            "hookFee": "183386602915352390838997",
+            "output": "17911369506742468013244876",
+            "reserve0": "11051626084",
+            "reserve1": "184700859535857966928825982",
+            "sqrtPriceX96": "10243356442937773207302155160557802660"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 15998099702640,
+            "amountIn": "8955684753371234006622438",
+            "block": 112288356,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667355,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "15998099702640",
+            "creatorTax": "6783166",
+            "hookFee": "5100125",
+            "output": "498129237",
+            "reserve0": "10541613553",
+            "reserve1": "193656544289229200935448418",
+            "sqrtPriceX96": "10739037940074238627758110802972333654"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test_GoDeployedFoundationSharedAaveRoute",
+      "passed": true,
+      "command": [
+        "forge",
+        "test",
+        "--ffi",
+        "--threads",
+        "1",
+        "--memory-limit",
+        "536870912",
+        "--gas-limit",
+        "64000000000",
+        "--match-contract",
+        "^KyberMainnetGoQuoteTest$",
+        "--match-test",
+        "^test_GoDeployedFoundationSharedAaveRoute\\(",
+        "-vv"
+      ],
+      "forgeRouterCallGas": [],
+      "quotes": [
+        {
+          "request": {
+            "aaveCash": 16008048076552,
+            "amountIn": "100000000000000000000000",
+            "block": 112288361,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "next": {
+              "fee": 2000,
+              "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+              "poolId": "0x6b3c745eb78ccff6ac9324eff212c00cbe2c84539b3fde964db4e5826d146e5d",
+              "tickSpacing": 200,
+              "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+              "token1": "0x85302724c17e665305B8970132f171a67E84044C"
+            },
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667425,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "after_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "16008043188742",
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "16008048076552",
+            "creatorTax": "65007",
+            "hookFee": "48878",
+            "output": "4773924",
+            "reserve0": "9995112190",
+            "reserve1": "204181632664723032068304870",
+            "second_creatorTax": "1292571941370261316931",
+            "second_hookFee": "971858602534031065361",
+            "second_output": "94921429709498814153899",
+            "second_reserve0": "10004773921",
+            "second_reserve1": "203984446804469628961768679",
+            "second_sqrtPriceX96": "11312919029809225704138222816883086310",
+            "sqrtPriceX96": "11323843809233785794220870435308802009"
+          }
+        }
+      ]
+    },
+    {
+      "name": "test_GoDeployedFoundationSharedAaveShortageAndRecovery",
+      "passed": true,
+      "command": [
+        "forge",
+        "test",
+        "--ffi",
+        "--threads",
+        "1",
+        "--memory-limit",
+        "536870912",
+        "--gas-limit",
+        "64000000000",
+        "--match-contract",
+        "^KyberMainnetGoQuoteTest$",
+        "--match-test",
+        "^test_GoDeployedFoundationSharedAaveShortageAndRecovery\\(",
+        "-vv"
+      ],
+      "forgeRouterCallGas": [],
+      "quotes": [
+        {
+          "request": {
+            "aaveCash": 10001000000,
+            "amountIn": "100000000000000000000000",
+            "block": 112288361,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "next": {
+              "fee": 2000,
+              "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+              "poolId": "0x6b3c745eb78ccff6ac9324eff212c00cbe2c84539b3fde964db4e5826d146e5d",
+              "tickSpacing": 200,
+              "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+              "token1": "0x85302724c17e665305B8970132f171a67E84044C"
+            },
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667425,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "after_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "9996112190",
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "10001000000",
+            "creatorTax": "65007",
+            "hookFee": "48878",
+            "output": "4773924",
+            "reserve0": "9995112190",
+            "reserve1": "204181632664723032068304870",
+            "secondRejected": "1",
+            "second_creatorTax": "1292571941370261316931",
+            "second_hookFee": "971858602534031065361",
+            "second_output": "94921429709498814153899",
+            "second_reserve0": "10004773921",
+            "second_reserve1": "203984446804469628961768679",
+            "second_sqrtPriceX96": "11312919029809225704138222816883086310",
+            "sqrtPriceX96": "11323843809233785794220870435308802009"
+          }
+        },
+        {
+          "request": {
+            "aaveCash": 16008048076552,
+            "amountIn": "100000000000000000000000",
+            "block": 112288361,
+            "fee": 2000,
+            "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+            "next": {
+              "fee": 2000,
+              "hook": "0x047ea2f55148b7601FDDe0d28588B55c09192ac4",
+              "poolId": "0x6b3c745eb78ccff6ac9324eff212c00cbe2c84539b3fde964db4e5826d146e5d",
+              "tickSpacing": 200,
+              "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+              "token1": "0x85302724c17e665305B8970132f171a67E84044C"
+            },
+            "poolId": "0xf8fb1646f6a9e1762acc031433dcdfcf064f1c6a34ee345a316adb6cc7e6193b",
+            "roundTrip": false,
+            "tickSpacing": 200,
+            "timestamp": 1791667425,
+            "token0": "0x754704Bc059F8C67012fEd69BC8A327a5aafb603",
+            "token1": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688",
+            "tokenIn": "0xB9287B72dc4Ef5DE4D7Cb1f9FEeDE1C3a813E688"
+          },
+          "quote": {
+            "after_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "16008043188742",
+            "before_ticker:143:aave:0x754704bc059f8c67012fed69bc8a327a5aafb603:cash": "16008048076552",
+            "creatorTax": "65007",
+            "hookFee": "48878",
+            "output": "4773924",
+            "reserve0": "9995112190",
+            "reserve1": "204181632664723032068304870",
+            "second_creatorTax": "1292571941370261316931",
+            "second_hookFee": "971858602534031065361",
+            "second_output": "94921429709498814153899",
+            "second_reserve0": "10004773921",
+            "second_reserve1": "203984446804469628961768679",
+            "second_sqrtPriceX96": "11312919029809225704138222816883086310",
+            "sqrtPriceX96": "11323843809233785794220870435308802009"
+          }
+        }
+      ]
+    }
+  ]
+}
