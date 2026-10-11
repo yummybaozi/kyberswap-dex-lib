@@ -1,9 +1,9 @@
-# Consolidated TickerMemeHook execution evidence
+# TickerMemeHook execution evidence
 
 This archive validates the `ticker-meme-v4` integration at Go commit
-`087aaffa61b5fdd2d8538e2bad4700e4e9f66d6b`. It contains execution evidence and an adapter patch,
-separate from the integration PR. This revision rechecks the atomic JSON decoding
-fix and records successful Go unit, race, vet and full-build checks.
+`d01998c3867f06618ca7cee556fb1c2431a82e53`. It contains execution evidence and an adapter patch,
+separate from the integration PR. This revision checks atomic JSON decoding, publishes the validated tracking
+block and records successful Go unit, race, vet and full-build checks.
 
 - Monad fork block: `112288351`.
 - Contracts harness base: `e068291086e8e32dfcba29268536f00b124ca8ef` in `jaybutera/ponsfamily` (access required).
@@ -21,7 +21,7 @@ Use fresh checkouts to reproduce:
 
 ```sh
 git clone --no-checkout https://github.com/yummybaozi/kyberswap-dex-lib.git ticker-meme-go
-git -C ticker-meme-go checkout 087aaffa61b5fdd2d8538e2bad4700e4e9f66d6b
+git -C ticker-meme-go checkout d01998c3867f06618ca7cee556fb1c2431a82e53
 git clone --no-checkout https://github.com/jaybutera/ponsfamily.git ticker-meme-harness
 git -C ticker-meme-harness checkout e068291086e8e32dfcba29268536f00b124ca8ef
 git -C ticker-meme-harness submodule update --init --recursive
@@ -30,7 +30,7 @@ cd ticker-meme-harness
 python3 tools/kyber/run-mainnet-go.py \
   --kyber-checkout /absolute/path/to/ticker-meme-go \
   --venue ticker-memehook --fork-block 112288351 \
-  --report-file deployments/kyber-meme-consolidated-run.json
+  --report-file deployments/kyber-meme-fresh-review-run.json
 ```
 
 Foundry, Go and archive access through `https://rpc.monad.xyz` are required. The

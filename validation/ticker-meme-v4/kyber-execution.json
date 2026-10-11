@@ -5,7 +5,7 @@
   ],
   "harnessCommit": "e068291086e8e32dfcba29268536f00b124ca8ef",
   "harnessPatchSha256": "1bfcc7f50b660e33cf098d2bd6fc7eb25d0c216698b6aa7b4ca66e1ce9f17222",
-  "goCommit": "087aaffa61b5fdd2d8538e2bad4700e4e9f66d6b",
+  "goCommit": "d01998c3867f06618ca7cee556fb1c2431a82e53",
   "goWorktreeChanges": "",
   "bridgeSourceSha256": {
     "ticker-memehook": "b4d91491e5be027daf2ca349cbb7c7c61a35b49ba54092d0d9282f4c10aeb5e0"
@@ -596,51 +596,5 @@
         }
       ]
     }
-  ],
-  "integration": {
-    "package": "ticker-meme-v4",
-    "exchange": "ticker-meme-v4",
-    "serializationBeforeQuotes": true,
-    "nativeKyberExecutionCovered": false
-  },
-  "validation": {
-    "localDate": "2026-10-11",
-    "timezone": "America/New_York",
-    "goChecks": [
-      {
-        "command": "CI=true TICKER_MEME_RPC=https://rpc.monad.xyz go test ./pkg/liquidity-source/uniswap/v4/... ./pkg/msgpack ./pkg/pooltypes -count=1",
-        "passed": true,
-        "testedPackages": 34
-      },
-      {
-        "command": "CI=true go test -race ./pkg/liquidity-source/uniswap/v4/hooks/ticker-meme-v4 ./pkg/liquidity-source/uniswap/v4 ./pkg/msgpack -count=1",
-        "passed": true,
-        "testedPackages": 3
-      },
-      {
-        "command": "CI=true go vet ./pkg/liquidity-source/uniswap/v4/... ./pkg/msgpack ./pkg/pooltypes",
-        "passed": true
-      },
-      {
-        "command": "go build ./...",
-        "passed": true
-      }
-    ],
-    "generation": {
-      "command": "go generate ./pkg/msgpack/...",
-      "passed": true,
-      "stable": true
-    },
-    "diffCheckPassed": true,
-    "tools": {
-      "go": "go version go1.25.10 darwin/arm64",
-      "forge": "forge Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf",
-      "anvil": "anvil Version: 1.5.1-stable\nCommit SHA: b0a9dd9ceda36f63e2326ce530c10e6916f4b8a2\nBuild Timestamp: 2025-12-22T11:41:09.812070000Z (1766403669)\nBuild Profile: maxperf"
-    },
-    "regression": {
-      "name": "TestMalformedExtraRemainsRejectedAfterMsgpack",
-      "failedBeforeFix": true,
-      "passedAfterFix": true
-    }
-  }
+  ]
 }
