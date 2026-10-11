@@ -23,7 +23,7 @@ func TestGasEstimateCoversMeasuredFixtureCases(t *testing.T) {
 		}
 		h := &Hook{Snapshot: Snapshot{State: fixtureState()}}
 		h.Pool.Buckets = make([]dualpool.Bucket, count)
-		q := Quote{Swap: dualpool.SwapInfo{Tick: h.Pool.Tick}}
+		q := Quote{Swap: SwapInfo{Tick: h.Pool.Tick}}
 		estimate := h.quoteGas(q) + uniswapv4.DefaultGas.BaseGas
 		for _, m := range fixture.Measurements {
 			require.GreaterOrEqual(t, estimate, m.EstimatedGas)

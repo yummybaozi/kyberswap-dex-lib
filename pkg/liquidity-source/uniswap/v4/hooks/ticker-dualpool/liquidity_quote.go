@@ -1,29 +1,31 @@
-package dualpool
+package tickerdualpool
 
 import (
 	"errors"
 
 	v3Utils "github.com/KyberNetwork/uniswapv3-sdk-uint256/utils"
 	"github.com/holiman/uint256"
+
+	"github.com/KyberNetwork/kyberswap-dex-lib/pkg/liquidity-source/uniswap/v4/hooks/dualpool"
 )
 
 var ErrInvalidQuoteState = errors.New("invalid DualPool quote state")
 
-// QuoteExactInput prices the temporary positions using v4 bitmap-word stepping.
+// quoteTemporaryLiquidity prices the temporary positions using v4 bitmap-word stepping.
 // It does not mutate state and does not apply a derived hook's output fees.
 // Derived integrations must check their own withdrawal limits before calling it.
-func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *uint256.Int) (SwapInfo, error) {
+func quoteTemporaryLiquidity(state dualpool.Extra, tickSpacing int, zeroForOne bool, amountIn *uint256.Int) (SwapInfo, error) {
 	if state.SqrtPriceX96 == nil || state.Balance0 == nil || state.Balance1 == nil || amountIn == nil {
-		return SwapInfo{}, ErrStateNotSet
+		return SwapInfo{}, dualpool.ErrStateNotSet
 	}
 	if !state.Live {
-		return SwapInfo{}, ErrPoolNotLive
+		return SwapInfo{}, dualpool.ErrPoolNotLive
 	}
 	if tickSpacing <= 0 || tickSpacing > 32767 || amountIn.IsZero() || amountIn.BitLen() > 127 {
 		return SwapInfo{}, ErrInvalidQuoteState
 	}
 	if len(state.Buckets) == 0 {
-		return SwapInfo{}, ErrNoDistribution
+		return SwapInfo{}, dualpool.ErrNoDistribution
 	}
 	if len(state.Buckets) > 8 {
 		return SwapInfo{}, ErrInvalidQuoteState
@@ -50,7 +52,7 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 	if weight != totalWeightBps {
 		return SwapInfo{}, ErrInvalidQuoteState
 	}
-	positions, err := allocate(state.Buckets, state.SqrtPriceX96, state.Balance0, state.Balance1)
+	positions, err := dualpool.AllocatePositions(state.Buckets, state.SqrtPriceX96, state.Balance0, state.Balance1)
 	if err != nil {
 		return SwapInfo{}, err
 	}
@@ -64,18 +66,18 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 	maxPerTick := new(uint256.Int).Div(uMaxUint128, uint256.NewInt(uint64(numTicks)))
 	grossAtTick := make(map[int]*uint256.Int, len(positions)*2)
 	for _, position := range positions {
-		for _, tick := range []int{position.tickLower, position.tickUpper} {
+		for _, tick := range []int{position.TickLower, position.TickUpper} {
 			gross := grossAtTick[tick]
 			if gross == nil {
 				gross = new(uint256.Int)
 				grossAtTick[tick] = gross
 			}
-			if _, overflow := gross.AddOverflow(gross, position.liquidity); overflow || gross.Cmp(maxPerTick) > 0 {
+			if _, overflow := gross.AddOverflow(gross, position.Liquidity); overflow || gross.Cmp(maxPerTick) > 0 {
 				return SwapInfo{}, ErrInvalidQuoteState
 			}
 		}
 	}
-	fee := effectiveSwapFee(state.LpFee, state.ProtocolFee, zeroForOne)
+	fee := dualpool.EffectiveSwapFee(state.LpFee, state.ProtocolFee, zeroForOne)
 	if fee >= maxSwapFee {
 		return SwapInfo{}, ErrInvalidQuoteState
 	}
@@ -135,23 +137,32 @@ func QuoteExactInput(state Extra, tickSpacing int, zeroForOne bool, amountIn *ui
 // Minting a position rounds its token cost up; burning rounds returned tokens down.
 func positionAmounts(p position, price *uint256.Int, roundUp bool) ([2]*uint256.Int, error) {
 	result := [2]*uint256.Int{new(uint256.Int), new(uint256.Int)}
-	if price.Cmp(p.sqrtUpper) < 0 {
+	if price.Cmp(p.SqrtUpper) < 0 {
 		lower := price
-		if price.Cmp(p.sqrtLower) < 0 {
-			lower = p.sqrtLower
+		if price.Cmp(p.SqrtLower) < 0 {
+			lower = p.SqrtLower
 		}
-		if err := v3Utils.GetAmount0DeltaV2(lower, p.sqrtUpper, p.liquidity, roundUp, result[0]); err != nil {
+		if err := v3Utils.GetAmount0DeltaV2(lower, p.SqrtUpper, p.Liquidity, roundUp, result[0]); err != nil {
 			return result, err
 		}
 	}
-	if price.Cmp(p.sqrtLower) > 0 {
+	if price.Cmp(p.SqrtLower) > 0 {
 		upper := price
-		if price.Cmp(p.sqrtUpper) > 0 {
-			upper = p.sqrtUpper
+		if price.Cmp(p.SqrtUpper) > 0 {
+			upper = p.SqrtUpper
 		}
-		if err := v3Utils.GetAmount1DeltaV2(p.sqrtLower, upper, p.liquidity, roundUp, result[1]); err != nil {
+		if err := v3Utils.GetAmount1DeltaV2(p.SqrtLower, upper, p.Liquidity, roundUp, result[1]); err != nil {
 			return result, err
 		}
 	}
 	return result, nil
+}
+
+// SwapInfo adds Ticker's temporary-liquidity movements to the swap result.
+type SwapInfo struct {
+	Balance0, Balance1                *uint256.Int
+	Mint0, Mint1, Burn0, Burn1        *uint256.Int
+	ZeroForOne                        bool
+	AmountIn, AmountOut, SqrtPriceX96 *uint256.Int
+	Tick                              int32
 }

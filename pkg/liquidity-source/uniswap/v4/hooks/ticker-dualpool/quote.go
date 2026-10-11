@@ -31,7 +31,7 @@ type Quote struct {
 	RawAfter, ClaimsAfter, ManagerCashBeforeSettlement, ManagerCashAfter [2]*uint256.Int
 	ReservesAfter                                                        [2]*AaveReserve
 	VaultsAfter                                                          [2]*AaveInventory
-	Swap                                                                 dualpool.SwapInfo
+	Swap                                                                 SwapInfo
 	NetOutput, HookFee, CreatorTax                                       *uint256.Int
 }
 
@@ -42,7 +42,7 @@ func QuoteExactInput(s State, zeroForOne bool, amountIn *uint256.Int) (Quote, er
 	if err != nil {
 		return Quote{}, err
 	}
-	swap, err := dualpool.QuoteExactInput(poolState, s.TickSpacing, zeroForOne, amountIn)
+	swap, err := quoteTemporaryLiquidity(poolState, s.TickSpacing, zeroForOne, amountIn)
 	if err != nil {
 		return Quote{}, err
 	}
@@ -51,7 +51,7 @@ func QuoteExactInput(s State, zeroForOne bool, amountIn *uint256.Int) (Quote, er
 		if uint32(s.HookFeeBps)+uint32(s.CreatorTaxBps) >= 10000 {
 			return Quote{}, ErrInvalidState
 		}
-		// Gross output is bounded to int128 by the shared calculation, so these
+		// Gross output is bounded to int128 by the liquidity calculation, so these
 		// products fit uint256. Do not combine the rates: that changes rounding.
 		denom := uint256.NewInt(10000)
 		fee.Mul(swap.AmountOut, uint256.NewInt(uint64(s.HookFeeBps))).Div(fee, denom)

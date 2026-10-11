@@ -26,6 +26,11 @@ Snapshots use the existing V4 `HookExtra` convention and preserve their block.
 The hook and interface-embedded `BaseHook` are registered for msgpack. The hook
 package tests that saving and loading preserves quotes and subsequent state updates.
 
+Ticker-specific stepping, position-fee collection, settlement amounts and their
+tests live in `ticker-dualpool`. The existing Twofold math and `SwapInfo` are
+unchanged. Small shared helpers expose allocation, individual swap steps, fee
+calculation and snapshot reading.
+
 ## Contracts and activation
 
 Monad chain ID: 143. Fork block: **112288351**.
