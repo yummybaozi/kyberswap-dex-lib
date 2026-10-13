@@ -113,11 +113,11 @@ func TestTrackerPublishesPinnedSnapshot(t *testing.T) {
 	require.Equal(t, s.Total1.Dec(), next.Total1.Dec())
 	require.Equal(t, s.Pool.Balance0.Dec(), next.State.Pool.Balance0.Dec())
 	// Exercise the full refresh with direct token balances and test-only bytecode.
-	oldProxy, oldHook := tickerProxyFingerprint, tickerHookFingerprint
-	tickerProxyFingerprint = runtimeFingerprint{Size: 1, Hash: crypto.Keccak256Hash([]byte{0x60})}
-	tickerHookFingerprint = tickerProxyFingerprint
-	t.Cleanup(func() { tickerProxyFingerprint, tickerHookFingerprint = oldProxy, oldHook })
-	implementation := common.HexToAddress("0x7890")
+	oldProxy, oldHook := tickerProxyCodeHash, tickerHookCodeHash
+	tickerProxyCodeHash = crypto.Keccak256Hash([]byte{0x60, 0, 0})
+	tickerHookCodeHash = tickerProxyCodeHash
+	t.Cleanup(func() { tickerProxyCodeHash, tickerHookCodeHash = oldProxy, oldHook })
+	implementation := tickerHookImplementation
 	p.Overrides = map[common.Address]gethclient.OverrideAccount{
 		address:        {Code: []byte{0x60, 0, 0}, State: map[common.Hash]common.Hash{implementationSlot: common.BytesToHash(implementation.Bytes())}},
 		implementation: {Code: []byte{0x60, 0, 0}},
@@ -158,4 +158,33 @@ func TestTrackerPublishesPinnedSnapshot(t *testing.T) {
 	after, err := json.Marshal(h.Snapshot)
 	require.NoError(t, err)
 	require.JSONEq(t, string(before), string(after))
+
+	// Exact hook pins reject metadata changes as well as executable changes.
+	batches[2][0] = pack(accountingABI, "poolManager", monadPoolManager)
+	for _, tc := range []struct {
+		name, stage    string
+		proxy, hook    []byte
+		implementation common.Address
+	}{
+		{"proxy metadata", "hook proxy bytecode", []byte{0x60, 0xa0, 0, 1}, []byte{0x60, 0, 0}, implementation},
+		{"hook metadata", "hook implementation", []byte{0x60, 0, 0}, []byte{0x60, 0xa0, 0, 1}, implementation},
+		{"hook instructions", "hook implementation", []byte{0x60, 0, 0}, []byte{0x61, 0, 0}, implementation},
+		{"missing hook code", "hook implementation", []byte{0x60, 0, 0}, []byte{}, implementation},
+		{"unknown implementation", "hook implementation address", []byte{0x60, 0, 0}, []byte{0x60, 0, 0}, common.HexToAddress("0x7890")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls = 0
+			p.Overrides = map[common.Address]gethclient.OverrideAccount{
+				address:           {Code: tc.proxy, State: map[common.Hash]common.Hash{implementationSlot: common.BytesToHash(tc.implementation.Bytes())}},
+				tc.implementation: {Code: tc.hook},
+			}
+			_, err := h.Track(context.Background(), p)
+			require.ErrorIs(t, err, ErrInvalidState)
+			require.ErrorContains(t, err, tc.stage)
+			require.Equal(t, uint64(100), p.Pool.BlockNumber)
+			after, err := json.Marshal(h.Snapshot)
+			require.NoError(t, err)
+			require.JSONEq(t, string(before), string(after), "rejected code must not replace the snapshot")
+		})
+	}
 }

@@ -35,7 +35,6 @@ var ErrRefreshRequired = errors.New("Ticker vault state must be refreshed after 
 type Snapshot struct {
 	Currencies               [2]common.Address
 	Reserves                 [2]*AaveReserve
-	Limits                   [2]*AaveLimits
 	Raw, Claims, ManagerCash [2]*uint256.Int
 	Aave                     [2]*AaveInventory
 	State
@@ -296,9 +295,6 @@ func (h *Hook) CloneState() uniswapv4.Hook {
 		clone.Raw[side] = copyInt(h.Raw[side])
 		clone.Claims[side] = copyInt(h.Claims[side])
 		clone.ManagerCash[side] = copyInt(h.ManagerCash[side])
-		if limits := h.Limits[side]; limits != nil {
-			clone.Limits[side] = &AaveLimits{MaxDeposit: copyInt(limits.MaxDeposit), MaxWithdraw: copyInt(limits.MaxWithdraw)}
-		}
 	}
 	clone.Total0 = copyInt(h.Total0)
 	clone.Total1 = copyInt(h.Total1)
