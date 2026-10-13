@@ -90,20 +90,57 @@ func TestCloneAccountingDoesNotSharePointers(t *testing.T) {
 		h.Raw[i] = uint256.NewInt(1)
 		h.Claims[i] = uint256.NewInt(2)
 		h.ManagerCash[i] = uint256.NewInt(3)
-		h.Limits[i] = &AaveLimits{uint256.NewInt(4), uint256.NewInt(5)}
 	}
 	clone := h.CloneState().(*Hook)
 	for i := 0; i < 2; i++ {
 		clone.Raw[i].Clear()
 		clone.Claims[i].Clear()
 		clone.ManagerCash[i].Clear()
-		clone.Limits[i].MaxDeposit.Clear()
-		clone.Limits[i].MaxWithdraw.Clear()
 		require.Equal(t, uint64(1), h.Raw[i].Uint64())
 		require.Equal(t, uint64(2), h.Claims[i].Uint64())
 		require.Equal(t, uint64(3), h.ManagerCash[i].Uint64())
-		require.Equal(t, uint64(4), h.Limits[i].MaxDeposit.Uint64())
-		require.Equal(t, uint64(5), h.Limits[i].MaxWithdraw.Uint64())
+	}
+}
+
+func TestLegacySnapshotLimitsAreIgnored(t *testing.T) {
+	// Older persisted snapshots included limits that pricing never consumed.
+	type legacyLimits struct{ MaxDeposit, MaxWithdraw *uint256.Int }
+	legacy := struct {
+		Snapshot
+		Limits [2]*legacyLimits
+	}{
+		Snapshot: Snapshot{State: fixtureState(), BlockNumber: 123},
+		Limits:   [2]*legacyLimits{{uint256.NewInt(0), uint256.NewInt(0)}, {uint256.NewInt(4), uint256.NewInt(5)}},
+	}
+	params := &uniswapv4.BeforeSwapParams{CalcOut: true, ZeroForOne: true, AmountSpecified: big.NewInt(1001)}
+	expected, err := (&Hook{Snapshot: legacy.Snapshot}).BeforeSwap(params)
+	require.NoError(t, err)
+	for _, codec := range []struct {
+		name      string
+		marshal   func(any) ([]byte, error)
+		unmarshal func([]byte, any) error
+	}{
+		{"json", json.Marshal, json.Unmarshal},
+		{"msgpack", wiremsgpack.Marshal, wiremsgpack.Unmarshal},
+	} {
+		t.Run(codec.name, func(t *testing.T) {
+			data, err := codec.marshal(legacy)
+			require.NoError(t, err)
+			var fields map[string]any
+			require.NoError(t, codec.unmarshal(data, &fields))
+			require.Contains(t, fields, "Limits", "fixture must use the old snapshot wire shape")
+			var restored Snapshot
+			require.NoError(t, codec.unmarshal(data, &restored))
+			require.Equal(t, legacy.Snapshot, restored)
+			actual, err := (&Hook{Snapshot: restored}).BeforeSwap(params)
+			require.NoError(t, err)
+			require.Equal(t, expected, actual)
+			data, err = codec.marshal(restored)
+			require.NoError(t, err)
+			fields = nil
+			require.NoError(t, codec.unmarshal(data, &fields))
+			require.NotContains(t, fields, "Limits")
+		})
 	}
 }
 

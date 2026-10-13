@@ -40,8 +40,6 @@ var stataProxyHashes = map[common.Address]common.Hash{
 	common.HexToAddress("0x967d427eF0Eb4AEB7a1B523A98B04061F094276B"): common.HexToHash("0xf4e412543dc42ed395f7dc7bf3cee8fbb387d5f99c54affc0754238f2b3144f7"),
 }
 
-type AaveLimits struct{ MaxDeposit, MaxWithdraw *uint256.Int }
-
 // StorageAt has no state-override parameter. Apply the exact eth_call override
 // semantics ourselves before falling back to the same pinned RPC block.
 func storageAt(ctx context.Context, p *uniswapv4.HookParam, address common.Address, slot common.Hash) (common.Hash, error) {
@@ -79,7 +77,7 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	if !tickerProxyFingerprint.matches(proxyCode) {
+	if crypto.Keccak256Hash(proxyCode) != tickerProxyCodeHash {
 		return nil, fmt.Errorf("hook proxy bytecode: %w", ErrInvalidState)
 	}
 	var poolManager common.Address
@@ -95,11 +93,15 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 	if err != nil {
 		return nil, err
 	}
-	code, err := codeAt(ctx, p, common.BytesToAddress(slot[:]))
+	implementation := common.BytesToAddress(slot[:])
+	if implementation != tickerHookImplementation {
+		return nil, fmt.Errorf("hook implementation address: %w", ErrInvalidState)
+	}
+	code, err := codeAt(ctx, p, implementation)
 	if err != nil {
 		return nil, err
 	}
-	if !matchesTickerHook(code) {
+	if crypto.Keccak256Hash(code) != tickerHookCodeHash {
 		return nil, fmt.Errorf("hook implementation: %w", ErrInvalidState)
 	}
 	var config uniswapv4.StaticExtra
@@ -248,7 +250,6 @@ func (h *Hook) Track(ctx context.Context, p *uniswapv4.HookParam) (json.RawMessa
 		}
 		candidate.Reserves[side] = reserve
 		candidate.Aave[side] = inventory
-		candidate.Limits[side] = &AaveLimits{uint256.MustFromBig(maxDeposit), uint256.MustFromBig(maxWithdraw)}
 		candidate.ManagerCash[side] = uint256.MustFromBig(managerCash)
 	}
 	raw, err := json.Marshal(candidate.Snapshot)
